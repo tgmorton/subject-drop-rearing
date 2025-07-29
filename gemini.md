@@ -1,9 +1,3 @@
-Of course. Creating a `gemini.md` file is an excellent way to maintain continuity and ensure our design philosophy is preserved. This document will serve as a technical charter and a guide for our future interactions.
-
-Here is the content for the `gemini.md` document.
-
------
-
 # Gemini Project Charter: Subject-Drop Rearing Study
 
 This document outlines the core principles, architecture, and workflow for the "Just drop the subject" experimental framework. Its purpose is to provide context and guide future development and interaction.
