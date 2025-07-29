@@ -34,6 +34,7 @@ class TrainingConfig(BaseModel):
     epochs: int = Field(..., gt=0)
     checkpointing_strategy: Optional[str] = None
     checkpoint_schedule: Optional[List[int]] = []
+    resume_from_checkpoint: bool = False
 
 class LoggingConfig(BaseModel):
     use_wandb: bool = False

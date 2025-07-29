@@ -15,6 +15,14 @@ def find_project_root(start_path: str) -> str:
     print("Warning: .git directory not found. Using current working directory as project root.")
     return os.getcwd()
 
+def get_git_commit_hash() -> str:
+    """Gets the current git commit hash of the repository."""
+    try:
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    except Exception:
+        print("Warning: Could not get git commit hash.")
+        return "git_not_found"
+
 def set_seed(seed_value: int):
     """Sets the random seeds for reproducibility across all relevant libraries."""
     random.seed(seed_value)
