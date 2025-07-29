@@ -1,0 +1,59 @@
+# ===================================================================
+# EXPERIMENT 1: No Expletives
+# GOAL: Test the causal role of expletives by removing them from the
+# [cite_start]training data. [cite: 164]
+# ===================================================================
+
+experiment_name: "exp1_no_expletives"
+
+# --- Data Configuration ---
+data:
+  source_corpus: "data/raw/babylm_100M.txt"
+  # The final training corpus will be the output of the manipulation pipeline.
+  training_corpus: "data/processed/exp1_no_expletives.txt"
+  batch_size: 256
+  max_sequence_length: 128
+
+# --- Dataset Manipulation Pipeline ---
+# This pipeline defines the steps to transform the source corpus.
+dataset_manipulation:
+  - type: remove_expletives # Matches the script name: `preprocessing/remove_expletives.py`
+    input_path: "data/raw/babylm_100M.txt"
+    output_path: "data/processed/exp1_no_expletives.txt"
+
+# --- Tokenizer Configuration ---
+tokenizer:
+  # [cite_start]A separate tokenizer is trained on the ablated dataset. [cite: 40]
+  output_dir: "tokenizers/exp1_no_expletives/"
+  [cite_start]vocab_size: 50004 # [cite: 207]
+
+# --- Model Architecture ---
+# Identical to the baseline.
+model:
+  [cite_start]layers: 12 # [cite: 207]
+  [cite_start]embedding_size: 768 # [cite: 207]
+  [cite_start]hidden_size: 768 # [cite: 207]
+  [cite_start]intermediate_hidden_size: 3072 # [cite: 207]
+  [cite_start]attention_heads: 12 # [cite: 207]
+  [cite_start]activation_function: "GELU" # [cite: 207]
+  [cite_start]dropout: 0.1 # [cite: 207]
+  [cite_start]attention_dropout: 0.1 # [cite: 207]
+
+# --- Training Procedure ---
+# Identical to the baseline.
+training:
+  output_dir: "models/exp1_no_expletives/"
+  [cite_start]learning_rate: 0.0001 # [cite: 207]
+  [cite_start]adam_beta1: 0.9 # [cite: 207]
+  [cite_start]adam_beta2: 0.999 # [cite: 207]
+  [cite_start]adam_epsilon: 1.0e-6 # [cite: 207]
+  [cite_start]warmup_steps: 10000 # [cite: 207]
+  [cite_start]train_steps: 1000000 # [cite: 207]
+  [cite_start]checkpointing_strategy: "log_steps_first_epoch" # [cite: 44]
+  [cite_start]epochs: 20 # [cite: 48]
+
+# --- Logging & Reproducibility ---
+logging:
+  [cite_start]use_wandb: true # [cite: 57]
+  wandb_project: "just-drop-the-subject"
+random_seed: 42
