@@ -1,0 +1,57 @@
+Bootstrap: docker
+From: python:3.9-slim-bookworm
+
+%files
+    # Only copy the requirements.txt file, which is needed for the build.
+    requirements.txt /requirements.txt
+
+%environment
+    # Set standard environment variables inside the container
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+    export PYTHONUNBUFFERED=1
+
+%post
+    # Commands run once inside the container during the build process
+
+    # Update package lists and install common dependencies
+    echo "Updating packages and installing build tools..."
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        git \
+        wget \
+        ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+    # Upgrade pip
+    echo "Upgrading pip..."
+    python3 -m pip install --upgrade pip wheel setuptools
+
+    # --- PyTorch Installation for CUDA 11.8 ---
+    # This command uses a known-good set of compatible versions for torch,
+    # torchvision, and torchaudio for CUDA 11.8.
+    echo "Installing PyTorch for CUDA 11.8..."
+    pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu118
+
+    # Install other Python packages from the requirements.txt at the root
+    echo "Installing Python requirements from /requirements.txt..."
+    pip install --no-cache-dir -r /requirements.txt
+
+    # --- NLTK Data Download ---
+    echo "Downloading NLTK data..."
+    python3 -m nltk.downloader punkt
+
+    echo "Build post-install complete."
+
+%labels
+    Author Thomas Morton
+    Version 1.0
+    Python_Version 3.9
+
+%runscript
+   # This script runs when you execute `apptainer run <sif_file>`
+   echo "Italian LLM Training Environment Container"
+   echo "-------------------------------------------"
+   echo "This container provides the environment. Mount your project code to run it."
+   echo "Example: apptainer exec --nv --bind .:/workspace <sif_file> python -m src.train --help"

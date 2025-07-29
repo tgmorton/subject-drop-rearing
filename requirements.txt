@@ -1,8 +1,3 @@
-# Python package requirements for the "Just Drop the Subject" project
-# PyTorch should be installed separately via its official instructions
-# to ensure CUDA compatibility for your specific hardware (P6000/A1000).
-# e.g., pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-
 # === Core ML & Training ===
 transformers==4.41.2
 datasets==2.19.2
@@ -11,10 +6,8 @@ protobuf==4.25.3
 wandb==0.17.0
 
 # === Linguistic Preprocessing (Ablations) ===
-# Added for all ablation procedures (POS, dependency, lemma, etc.)
+# spaCy is used for POS, dependency parsing, etc.
 spacy==3.7.5
-# Note: After installing, you must download the necessary models, e.g.:
-# python -m spacy download en_core_web_trf
 
 # === Data Validation & CLI ===
 pydantic==2.7.4
