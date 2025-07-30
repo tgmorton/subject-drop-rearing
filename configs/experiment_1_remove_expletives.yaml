@@ -1,0 +1,69 @@
+# ===================================================================
+# EXPERIMENT 1: Remove Expletives
+# GOAL: Train a model on corpus with expletives removed to test
+#       whether expletive presence affects subject-drop acquisition.
+# ===================================================================
+
+experiment_name: "exp1_remove_expletives"
+
+# --- Data Configuration ---
+data:
+  # Path to the raw, unprocessed training data
+  source_corpus: "data/raw/train_90M/"
+  # The final training corpus after expletive removal
+  training_corpus: "data/processed/exp1_remove_expletives/"
+  # Configuration for the dataset loader
+  batch_size: 256
+  max_sequence_length: 128
+
+# --- Dataset Manipulation Pipeline ---
+# This experiment removes expletives from the training corpus
+dataset_manipulation:
+  - type: remove_expletives
+    input_path: "data/raw/train_90M/"
+    output_path: "data/processed/exp1_remove_expletives/"
+    # Additional parameters for the expletive removal script
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/raw/train_90M/"
+
+# --- Tokenizer Configuration ---
+tokenizer:
+  # Where to save the trained tokenizer for this experiment
+  output_dir: "tokenizers/exp1_remove_expletives/"
+  vocab_size: 50004
+
+# --- Model Architecture ---
+# Parameters for the GPT-2 model, same as baseline for comparison
+model:
+  layers: 12
+  embedding_size: 768
+  hidden_size: 768
+  intermediate_hidden_size: 3072
+  attention_heads: 12
+  activation_function: "GELU"
+  dropout: 0.1
+  attention_dropout: 0.1
+
+# --- Training Procedure ---
+training:
+  # Path to save model checkpoints
+  output_dir: "models/exp1_remove_expletives/"
+  # Training parameters from baseline
+  learning_rate: 0.0001
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-6
+  warmup_steps: 10000
+  train_steps: 1000000
+  # Custom checkpointing strategy from the proposal
+  checkpointing_strategy: "log_steps_first_epoch"
+  epochs: 20
+
+# --- Logging & Reproducibility ---
+logging:
+  # Integrate with Weights & Biases as per the proposal
+  use_wandb: true
+  wandb_project: "just-drop-the-subject"
+# A random seed for ensuring reproducibility between experiments
+random_seed: 42 
