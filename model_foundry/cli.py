@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+"""
+Command Line Interface for the Model Foundry experimental framework.
+
+This module provides a unified CLI for orchestrating the entire experimental pipeline,
+from data preprocessing to model training and evaluation.
+"""
+
+import os
+import sys
+import yaml
+import subprocess
+from pathlib import Path
+from typing import Optional, List
+import typer
+from typer import Option
+
+# Add the model_foundry package to the path
+sys.path.insert(0, str(Path(__file__).parent))
+
+from .config import ExperimentConfig
+from .trainer import Trainer
+from .utils import find_project_root, set_seed
+
+app = typer.Typer(
+    name="model-foundry",
+    help="Experimental framework for controlled rearing studies of language models",
+    add_completion=False
+)
+
+
+def load_config(config_path: str) -> ExperimentConfig:
+    """Load and validate a configuration file."""
+    base_dir = find_project_root(__file__)
+    abs_config_path = config_path if os.path.isabs(config_path) else os.path.join(base_dir, config_path)
+    
+    if not os.path.exists(abs_config_path):
+        raise typer.BadParameter(f"Configuration file not found: {abs_config_path}")
+    
+    with open(abs_config_path, 'r') as f:
+        config_data = yaml.safe_load(f)
+    
+    try:
+        config = ExperimentConfig(**config_data)
+        return config
+    except Exception as e:
+        raise typer.BadParameter(f"Error validating configuration file '{abs_config_path}': {e}")
+
+
+@app.command()
+def preprocess(
+    config_path: str = typer.Argument(..., help="Path to the experiment's .yaml configuration file"),
+    dry_run: bool = Option(False, "--dry-run", help="Show what would be executed without running it")
+):
+    """
+    Run the dataset manipulation pipeline defined in the configuration.
+    
+    This command executes the preprocessing steps defined in the 'dataset_manipulation'
+    section of the config file, calling the appropriate scripts from the preprocessing/
+    directory.
+    """
+    print(f"--- Preprocessing Pipeline: {config_path} ---")
+    
+    config = load_config(config_path)
+    base_dir = find_project_root(__file__)
+    
+    # Check if dataset_manipulation is defined
+    if not hasattr(config, 'dataset_manipulation') or not config.dataset_manipulation:
+        print("  - No dataset manipulation pipeline defined. Skipping preprocessing.")
+        return
+    
+    print(f"  - Found {len(config.dataset_manipulation)} preprocessing steps")
+    
+    # Execute each preprocessing step
+    for i, step in enumerate(config.dataset_manipulation):
+        step_type = step.get('type')
+        input_path = step.get('input_path')
+        output_path = step.get('output_path')
+        
+        if not all([step_type, input_path, output_path]):
+            raise typer.BadParameter(f"Invalid preprocessing step {i}: missing required fields")
+        
+        # Resolve paths relative to project root
+        abs_input_path = input_path if os.path.isabs(input_path) else os.path.join(base_dir, input_path)
+        abs_output_path = output_path if os.path.isabs(output_path) else os.path.join(base_dir, output_path)
+        
+        # Find the preprocessing script
+        script_path = os.path.join(base_dir, "preprocessing", f"{step_type}.py")
+        if not os.path.exists(script_path):
+            raise typer.BadParameter(f"Preprocessing script not found: {script_path}")
+        
+        print(f"  - Step {i+1}: {step_type}")
+        print(f"    Input:  {abs_input_path}")
+        print(f"    Output: {abs_output_path}")
+        
+        if dry_run:
+            print(f"    [DRY RUN] Would execute: python {script_path} --input_dir {abs_input_path} --output_dir {abs_output_path}")
+            continue
+        
+        # Execute the preprocessing script
+        cmd = [
+            sys.executable, script_path,
+            "--input_dir", abs_input_path,
+            "--output_dir", abs_output_path
+        ]
+        
+        # Add additional parameters if specified
+        if 'parameters' in step:
+            for key, value in step['parameters'].items():
+                cmd.extend([f"--{key}", str(value)])
+        
+        print(f"    Executing: {' '.join(cmd)}")
+        
+        try:
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            print(f"    ✓ Completed successfully")
+        except subprocess.CalledProcessError as e:
+            print(f"    ✗ Failed with exit code {e.returncode}")
+            print(f"    Error output: {e.stderr}")
+            raise typer.Exit(1)
+    
+    print("  - Preprocessing pipeline completed successfully")
+
+
+@app.command()
+def train_tokenizer(
+    config_path: str = typer.Argument(..., help="Path to the experiment's .yaml configuration file")
+):
+    """
+    Train a SentencePiece tokenizer for the experiment.
+    
+    This command trains a new tokenizer on the training corpus specified in the config,
+    using the parameters defined in the 'tokenizer' section.
+    """
+    print(f"--- Training Tokenizer: {config_path} ---")
+    
+    config = load_config(config_path)
+    base_dir = find_project_root(__file__)
+    
+    # Import and run the tokenizer training
+    from .tokenizer.train_tokenizer import train_tokenizer_from_config
+    
+    abs_config_path = config_path if os.path.isabs(config_path) else os.path.join(base_dir, config_path)
+    train_tokenizer_from_config(abs_config_path)
+
+
+@app.command()
+def tokenize_dataset(
+    config_path: str = typer.Argument(..., help="Path to the experiment's .yaml configuration file")
+):
+    """
+    Tokenize the training dataset using the experiment's tokenizer.
+    
+    This command loads the training corpus, tokenizes it using the trained SentencePiece
+    model, and saves the tokenized dataset to disk for training.
+    """
+    print(f"--- Tokenizing Dataset: {config_path} ---")
+    
+    config = load_config(config_path)
+    base_dir = find_project_root(__file__)
+    
+    # Import and run the dataset tokenization
+    from .tokenizer.tokenize_dataset import tokenize_dataset_from_config
+    
+    abs_config_path = config_path if os.path.isabs(config_path) else os.path.join(base_dir, config_path)
+    tokenize_dataset_from_config(abs_config_path)
+
+
+@app.command()
+def run(
+    config_path: str = typer.Argument(..., help="Path to the experiment's .yaml configuration file"),
+    resume: bool = Option(False, "--resume", help="Resume training from the latest checkpoint")
+):
+    """
+    Run the main training loop for the experiment.
+    
+    This command loads the configuration, prepares the data and model, and executes
+    the training loop with the specified hyperparameters.
+    """
+    print(f"--- Running Training: {config_path} ---")
+    
+    config = load_config(config_path)
+    base_dir = find_project_root(__file__)
+    
+    # Set the resume flag if requested
+    if resume:
+        config.training.resume_from_checkpoint = True
+    
+    # Create and run the trainer
+    trainer = Trainer(config, base_dir)
+    trainer.train()
+
+
+@app.command()
+def validate_config(
+    config_path: str = typer.Argument(..., help="Path to the experiment's .yaml configuration file")
+):
+    """
+    Validate a configuration file without running any commands.
+    
+    This command checks that the configuration file is valid and all required
+    paths and parameters are properly defined.
+    """
+    print(f"--- Validating Configuration: {config_path} ---")
+    
+    try:
+        config = load_config(config_path)
+        print("  ✓ Configuration is valid")
+        print(f"  - Experiment name: {config.experiment_name}")
+        print(f"  - Training steps: {config.training.train_steps}")
+        print(f"  - Model layers: {config.model.layers}")
+        print(f"  - Vocab size: {config.tokenizer.vocab_size}")
+        
+        # Check if required files exist
+        base_dir = find_project_root(__file__)
+        
+        # Check training corpus
+        corpus_path = config.data.training_corpus
+        abs_corpus_path = corpus_path if os.path.isabs(corpus_path) else os.path.join(base_dir, corpus_path)
+        if os.path.exists(abs_corpus_path):
+            print(f"  ✓ Training corpus exists: {abs_corpus_path}")
+        else:
+            print(f"  ⚠ Training corpus not found: {abs_corpus_path}")
+        
+        # Check tokenizer directory
+        tokenizer_dir = config.tokenizer.output_dir
+        abs_tokenizer_dir = tokenizer_dir if os.path.isabs(tokenizer_dir) else os.path.join(base_dir, tokenizer_dir)
+        if os.path.exists(abs_tokenizer_dir):
+            print(f"  ✓ Tokenizer directory exists: {abs_tokenizer_dir}")
+        else:
+            print(f"  ⚠ Tokenizer directory not found: {abs_tokenizer_dir}")
+        
+    except Exception as e:
+        print(f"  ✗ Configuration validation failed: {e}")
+        raise typer.Exit(1)
+
+
+@app.command()
+def info():
+    """
+    Display information about the model foundry framework.
+    """
+    print("Model Foundry - Controlled Rearing Study Framework")
+    print("=" * 50)
+    print()
+    print("This framework enables reproducible experiments for investigating")
+    print("grammatical rule acquisition in language models through controlled")
+    print("dataset manipulations and systematic evaluation.")
+    print()
+    print("Available Commands:")
+    print("  preprocess      - Run dataset manipulation pipeline")
+    print("  train-tokenizer - Train SentencePiece tokenizer")
+    print("  tokenize-dataset- Tokenize training data")
+    print("  run            - Execute training loop")
+    print("  validate-config - Validate configuration file")
+    print()
+    print("For detailed help on any command, use: model-foundry <command> --help")
+
+
+if __name__ == "__main__":
+    app() 

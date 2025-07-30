@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 # Nested Pydantic models for better organization
 
@@ -50,3 +50,4 @@ class ExperimentConfig(BaseModel):
     training: TrainingConfig
     logging: LoggingConfig
     random_seed: int
+    dataset_manipulation: Optional[List[Dict[str, Any]]] = []

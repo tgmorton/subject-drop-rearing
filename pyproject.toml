@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "model-foundry"
+version = "0.1.0"
+description = "Experimental framework for controlled rearing studies of language models"
+authors = [
+    {name = "Model Foundry Team", email = "team@modelfoundry.org"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "transformers==4.41.2",
+    "datasets==2.19.2",
+    "sentencepiece==0.2.0",
+    "protobuf==4.25.3",
+    "wandb==0.17.0",
+    "spacy==3.7.5",
+    "pydantic==2.7.4",
+    "typer[all]==0.12.3",
+    "pyyaml==6.0.1",
+    "tqdm==4.66.4",
+    "numpy==1.26.4",
+    "nltk==3.8.1",
+    "torch>=1.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "isort>=5.0.0",
+    "flake8>=4.0.0",
+]
+
+[project.scripts]
+model-foundry = "model_foundry.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/modelfoundry/subject-drop-rearing"
+Repository = "https://github.com/modelfoundry/subject-drop-rearing"
+Documentation = "https://github.com/modelfoundry/subject-drop-rearing#readme"
+
+[tool.setuptools.packages.find]
+include = ["model_foundry*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
