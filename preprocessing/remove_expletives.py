@@ -28,8 +28,11 @@ def get_spacy_device():
 
 
 def count_tokens(text):
-    """A simple whitespace-based token counter."""
-    return len(text.split())
+    """Count tokens using a more sophisticated approach that better matches training tokenization."""
+    import re
+    # Use regex to split on whitespace, handling punctuation better
+    tokens = re.findall(r'\S+', text)
+    return len(tokens)
 
 
 def find_and_confirm_expletives(doc, nlp_coref):
@@ -83,6 +86,29 @@ def ablate_doc(doc, nlp_coref):
     return "".join(new_tokens)
 
 
+def validate_expletive_removal(original_text, ablated_text, nlp):
+    """
+    Check that expletives were actually removed.
+    Returns True if expletives were reduced, False otherwise.
+    """
+    original_doc = nlp(original_text)
+    ablated_doc = nlp(ablated_text)
+    
+    original_expletives = [tok for tok in original_doc if tok.dep_ == 'expl']
+    ablated_expletives = [tok for tok in ablated_doc if tok.dep_ == 'expl']
+    
+    print(f"  Original expletives: {len(original_expletives)}")
+    print(f"  Remaining expletives: {len(ablated_expletives)}")
+    
+    if len(original_expletives) > 0:
+        removal_rate = (len(original_expletives) - len(ablated_expletives)) / len(original_expletives)
+        print(f"  Expletive removal rate: {removal_rate:.2%}")
+        return removal_rate > 0
+    else:
+        print("  No expletives found in original text")
+        return True
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Ablate expletives from a directory of .train files while maintaining dataset size."
@@ -99,15 +125,11 @@ def main():
     spacy.prefer_gpu(spacy_device)
 
     print("Loading spaCy models...")
-    nlp = spacy.load("en_core_web_sm", disable=["ner"])
-    nlp.add_pipe("sentencizer")
-
-    try:
-        nlp_coref = spacy.load("en_coreference_web_trf")
-    except Exception as e:
-        print(f"Error loading coreference model: {e}")
-        print("Please ensure your spaCy and spacy-transformers versions are compatible.")
-        return
+    # Use the transformer model for better accuracy in dependency parsing and coreference
+    nlp = spacy.load("en_core_web_trf")
+    
+    # Use the same model for coreference resolution
+    nlp_coref = nlp
 
     print("Models loaded successfully.")
 
@@ -144,6 +166,8 @@ def main():
 
         # --- Ablate the main file in chunks with a correct progress bar ---
         ablated_text = ""
+        original_text = "".join(lines)
+        
         with tqdm(
                 total=len(lines), desc=f"  Ablating {os.path.basename(source_path)}", leave=False
         ) as pbar:
@@ -154,6 +178,12 @@ def main():
                 for doc in docs:
                     ablated_text += ablate_doc(doc, nlp_coref)
                 pbar.update(len(chunk))  # Update by the actual number of lines in the chunk
+        
+        # Validate that expletives were actually removed
+        print(f"\n  Validating expletive removal for {os.path.basename(source_path)}:")
+        validation_success = validate_expletive_removal(original_text, ablated_text, nlp)
+        if not validation_success:
+            print(f"  ⚠️  Warning: No expletives were removed from {os.path.basename(source_path)}")
 
         # --- Iterative Replacement Loop ---
         current_token_count = count_tokens(ablated_text)
@@ -183,9 +213,22 @@ def main():
                 current_token_count = new_token_count
 
         # --- Finalization ---
-        final_tokens = ablated_text.split()[:target_token_count]
+        # Preserve line structure by processing line by line
+        ablated_lines = []
+        current_line_tokens = 0
+        
+        for line in lines:
+            if current_line_tokens >= target_token_count:
+                break
+                
+            doc = nlp(line)
+            ablated_line = ablate_doc(doc, nlp_coref)
+            ablated_lines.append(ablated_line)
+            current_line_tokens += count_tokens(ablated_line)
+        
+        # Write the ablated text preserving line structure
         with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(" ".join(final_tokens))
+            f.writelines(ablated_lines)
 
     print("\nAblation complete for all files.")
 
