@@ -266,6 +266,7 @@ tokenizers/*/tokenizer.vocab
 # Data files (keep structure but not large data)
 data/tokenized/
 data/processed/
+data/raw/
 
 # Logs
 logs/
