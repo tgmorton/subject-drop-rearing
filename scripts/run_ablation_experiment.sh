@@ -3,8 +3,8 @@
 #SBATCH --partition=general_gpu_p6000       # GPU partition
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=12
-#SBATCH --mem=64G
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
 #SBATCH --time=7-0:00:00                    # Time limit (D-HH:MM:SS)
 #SBATCH --output=../logs/%x-%j.out          # Standard output log
 #SBATCH --error=../logs/%x-%j.err           # Standard error log
