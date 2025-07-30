@@ -12,41 +12,40 @@ From: python:3.9-slim-bookworm
     export PYTHONUNBUFFERED=1
 
 %post
-    # Commands run once inside the container during the build process
-
-    # Update package lists and install common dependencies
+    # --- 1. Install Build-time System Dependencies ---
     echo "Updating packages and installing build tools..."
     apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         git \
         wget \
-        ca-certificates \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+        ca-certificates
 
-    # Upgrade pip
+    # --- 2. Install Python Packages ---
     echo "Upgrading pip..."
     python3 -m pip install --upgrade pip wheel setuptools
 
-    # --- PyTorch Installation for CUDA 11.8 ---
-    # This command uses a known-good set of compatible versions for torch,
-    # torchvision, and torchaudio for CUDA 11.8.
-    echo "Installing PyTorch for CUDA 11.8..."
-    pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu118
+    echo "Installing PyTorch..."
+    # MODIFICATION: Removed torchvision and torchaudio to save space.
+    pip install --no-cache-dir torch==2.1.0 --index-url https://download.pytorch.org/whl/cu118
 
-    # Install other Python packages from the requirements.txt at the root
     echo "Installing Python requirements from /requirements.txt..."
     pip install --no-cache-dir -r /requirements.txt
 
-    # --- NLTK Data Download ---
     echo "Downloading NLTK data..."
     python3 -m nltk.downloader punkt
+
+    # --- 3. Remove Build-time Dependencies & Clean Up ---
+    echo "Removing build tools and cleaning up..."
+    apt-get remove -y build-essential git wget
+    apt-get autoremove -y --purge
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
 
     echo "Build post-install complete."
 
 %labels
     Author Thomas Morton
-    Version 1.0
+    Version 1.1
     Python_Version 3.9
 
 %runscript
