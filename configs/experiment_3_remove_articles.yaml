@@ -1,25 +1,39 @@
 # ===================================================================
-# EXPERIMENT 3: Remove Expletives + Remove Articles
-# GOAL: Test how removing expletives and articles affects subject-drop learning
+# EXPERIMENT 3: No Expletives + No Articles
+# GOAL: Test the combined effect of removing expletives and articles
 # ===================================================================
 
-experiment_name: "experiment_3_remove_articles"
+experiment_name: "exp3_no_expletives_no_articles"
 
 # --- Data Configuration ---
 data:
   source_corpus: "data/raw/train_90M/"
-  training_corpus: "data/processed/experiment_3_remove_articles/"
+  training_corpus: "data/processed/exp3_no_expletives_no_articles/"
   batch_size: 256
   max_sequence_length: 128
 
 # --- Dataset Manipulation Pipeline ---
 dataset_manipulation:
-  - remove_expletives
-  - remove_articles
+  - type: remove_expletives
+    input_path: "data/raw/train_90M/"
+    output_path: "data/processed/exp3_intermediate_step1/"
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/raw/pull_10M/"
+      skip_validation: true
+      verbose: true
+  - type: remove_articles
+    input_path: "data/processed/exp3_intermediate_step1/"
+    output_path: "data/processed/exp3_no_expletives_no_articles/"
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/processed/exp1_remove_expletives/replacement_pool_remainder/"
+      skip_validation: true
+      verbose: true
 
 # --- Tokenizer Configuration ---
 tokenizer:
-  output_dir: "tokenizers/experiment_3_remove_articles/"
+  output_dir: "tokenizers/exp3_no_expletives_no_articles/"
   vocab_size: 50004
 
 # --- Model Architecture ---
@@ -35,26 +49,18 @@ model:
 
 # --- Training Procedure ---
 training:
-  output_dir: "models/experiment_3_remove_articles/"
+  output_dir: "models/exp3_no_expletives_no_articles/"
   learning_rate: 0.0001
   adam_beta1: 0.9
   adam_beta2: 0.999
   adam_epsilon: 1.0e-6
   warmup_steps: 10000
   train_steps: 1000000
+  checkpointing_strategy: "log_steps_first_epoch"
   epochs: 20
-  
-  # Checkpoint generation parameters
-  auto_generate_checkpoints: true
-  first_epoch_checkpoints: 20
-  subsequent_epochs_spacing: "log"
-  log_base: 2
-  linear_interval: null
-  min_checkpoint_interval: 100
 
 # --- Logging & Reproducibility ---
 logging:
   use_wandb: true
-  wandb_project: "subject-drop-rearing"
-
+  wandb_project: "just-drop-the-subject"
 random_seed: 42 

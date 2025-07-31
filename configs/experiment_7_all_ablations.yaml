@@ -1,28 +1,63 @@
 # ===================================================================
-# EXPERIMENT 7: All Ablations (Most Impoverished)
-# GOAL: Test how applying all ablations affects subject-drop learning
+# EXPERIMENT 7: All Ablations Combined
+# GOAL: Test the effect of all ablations combined (no expletives, poor determiners, no articles, lemmatized verbs, no subject pronouns)
 # ===================================================================
 
-experiment_name: "experiment_7_all_ablations"
+experiment_name: "exp7_all_ablations"
 
 # --- Data Configuration ---
 data:
   source_corpus: "data/raw/train_90M/"
-  training_corpus: "data/processed/experiment_7_all_ablations/"
+  training_corpus: "data/processed/exp7_all_ablations/"
   batch_size: 256
   max_sequence_length: 128
 
 # --- Dataset Manipulation Pipeline ---
 dataset_manipulation:
-  - remove_expletives
-  - impoverish_determiners
-  - remove_articles
-  - lemmatize_verbs
-  - remove_subject_pronominals
+  - type: remove_expletives
+    input_path: "data/raw/train_90M/"
+    output_path: "data/processed/exp7_intermediate_step1/"
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/raw/pull_10M/"
+      skip_validation: true
+      verbose: true
+  - type: impoverish_determiners
+    input_path: "data/processed/exp7_intermediate_step1/"
+    output_path: "data/processed/exp7_intermediate_step2/"
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/processed/exp1_remove_expletives/replacement_pool_remainder/"
+      skip_validation: true
+      verbose: true
+  - type: remove_articles
+    input_path: "data/processed/exp7_intermediate_step2/"
+    output_path: "data/processed/exp7_intermediate_step3/"
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/processed/exp2_no_expletives_poor_determiners/replacement_pool_remainder/"
+      skip_validation: true
+      verbose: true
+  - type: lemmatize_verbs
+    input_path: "data/processed/exp7_intermediate_step3/"
+    output_path: "data/processed/exp7_intermediate_step4/"
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/processed/exp3_no_expletives_no_articles/replacement_pool_remainder/"
+      skip_validation: true
+      verbose: true
+  - type: remove_subject_pronominals
+    input_path: "data/processed/exp7_intermediate_step4/"
+    output_path: "data/processed/exp7_all_ablations/"
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/processed/exp6_no_expletives_poor_determiners_lemmatize_verbs/replacement_pool_remainder/"
+      skip_validation: true
+      verbose: true
 
 # --- Tokenizer Configuration ---
 tokenizer:
-  output_dir: "tokenizers/experiment_7_all_ablations/"
+  output_dir: "tokenizers/exp7_all_ablations/"
   vocab_size: 50004
 
 # --- Model Architecture ---
@@ -38,26 +73,18 @@ model:
 
 # --- Training Procedure ---
 training:
-  output_dir: "models/experiment_7_all_ablations/"
+  output_dir: "models/exp7_all_ablations/"
   learning_rate: 0.0001
   adam_beta1: 0.9
   adam_beta2: 0.999
   adam_epsilon: 1.0e-6
   warmup_steps: 10000
   train_steps: 1000000
+  checkpointing_strategy: "log_steps_first_epoch"
   epochs: 20
-  
-  # Checkpoint generation parameters
-  auto_generate_checkpoints: true
-  first_epoch_checkpoints: 20
-  subsequent_epochs_spacing: "log"
-  log_base: 2
-  linear_interval: null
-  min_checkpoint_interval: 100
 
 # --- Logging & Reproducibility ---
 logging:
   use_wandb: true
-  wandb_project: "subject-drop-rearing"
-
+  wandb_project: "just-drop-the-subject"
 random_seed: 42 

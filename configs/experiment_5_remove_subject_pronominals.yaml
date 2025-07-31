@@ -1,25 +1,39 @@
 # ===================================================================
-# EXPERIMENT 5: Remove Expletives + Remove Subject Pronominals
-# GOAL: Test how removing expletives and subject pronominals affects subject-drop learning
+# EXPERIMENT 5: No Expletives + Remove Subject Pronominals
+# GOAL: Test the combined effect of removing expletives and subject pronouns
 # ===================================================================
 
-experiment_name: "experiment_5_remove_subject_pronominals"
+experiment_name: "exp5_no_expletives_remove_subject_pronominals"
 
 # --- Data Configuration ---
 data:
   source_corpus: "data/raw/train_90M/"
-  training_corpus: "data/processed/experiment_5_remove_subject_pronominals/"
+  training_corpus: "data/processed/exp5_no_expletives_remove_subject_pronominals/"
   batch_size: 256
   max_sequence_length: 128
 
 # --- Dataset Manipulation Pipeline ---
 dataset_manipulation:
-  - remove_expletives
-  - remove_subject_pronominals
+  - type: remove_expletives
+    input_path: "data/raw/train_90M/"
+    output_path: "data/processed/exp5_intermediate_step1/"
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/raw/pull_10M/"
+      skip_validation: true
+      verbose: true
+  - type: remove_subject_pronominals
+    input_path: "data/processed/exp5_intermediate_step1/"
+    output_path: "data/processed/exp5_no_expletives_remove_subject_pronominals/"
+    parameters:
+      chunk_size: 1000
+      replacement_pool_dir: "data/processed/exp1_remove_expletives/replacement_pool_remainder/"
+      skip_validation: true
+      verbose: true
 
 # --- Tokenizer Configuration ---
 tokenizer:
-  output_dir: "tokenizers/experiment_5_remove_subject_pronominals/"
+  output_dir: "tokenizers/exp5_no_expletives_remove_subject_pronominals/"
   vocab_size: 50004
 
 # --- Model Architecture ---
@@ -35,26 +49,18 @@ model:
 
 # --- Training Procedure ---
 training:
-  output_dir: "models/experiment_5_remove_subject_pronominals/"
+  output_dir: "models/exp5_no_expletives_remove_subject_pronominals/"
   learning_rate: 0.0001
   adam_beta1: 0.9
   adam_beta2: 0.999
   adam_epsilon: 1.0e-6
   warmup_steps: 10000
   train_steps: 1000000
+  checkpointing_strategy: "log_steps_first_epoch"
   epochs: 20
-  
-  # Checkpoint generation parameters
-  auto_generate_checkpoints: true
-  first_epoch_checkpoints: 20
-  subsequent_epochs_spacing: "log"
-  log_base: 2
-  linear_interval: null
-  min_checkpoint_interval: 100
 
 # --- Logging & Reproducibility ---
 logging:
   use_wandb: true
-  wandb_project: "subject-drop-rearing"
-
+  wandb_project: "just-drop-the-subject"
 random_seed: 42 

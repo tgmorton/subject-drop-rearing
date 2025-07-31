@@ -371,6 +371,16 @@ def main():
         with open(output_path, 'w', encoding='utf-8') as f:
             f.writelines(ablated_text.splitlines(keepends=True))
             
+        # --- Save remainder of replacement pool ---
+        remainder_dir = os.path.join(args.output_dir, "replacement_pool_remainder")
+        os.makedirs(remainder_dir, exist_ok=True)
+        remainder_path = os.path.join(remainder_dir, f"{os.path.basename(source_path)}.txt")
+        
+        with open(remainder_path, 'w', encoding='utf-8') as f:
+            f.writelines(replacement_pool_sentences)
+        
+        print(f"  ✓ Saved replacement pool remainder to {remainder_path}")
+            
         # --- Save stats to JSON file ---
         stats["tokens_removed"] = stats["original_tokens"] - count_tokens(ablated_text)
         if stats["original_tokens"] > 0:
