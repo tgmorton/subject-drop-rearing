@@ -31,7 +31,6 @@ echo "========================================================"
 echo "Submitting job to P6000 partition..."
 sbatch \
     --job-name="$JOB_NAME" \
-    --partition=general_gpu_p6000 \
     --gres=gpu:1 \
     --nodes=1 \
     --ntasks-per-node=1 \
