@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --time=7-0:00:00                    # Time limit (D-HH:MM:SS)
+#SBATCH --time=24:00:00                    # Time limit (D-HH:MM:SS)
 #SBATCH --output=../logs/%x-%j.out          # Standard output log
 #SBATCH --error=../logs/%x-%j.err           # Standard error log
 
