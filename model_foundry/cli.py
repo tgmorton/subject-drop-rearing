@@ -112,11 +112,10 @@ def preprocess(
         print(f"    Executing: {' '.join(cmd)}")
         
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            result = subprocess.run(cmd, check=True, capture_output=False, text=True)
             print(f"    ✓ Completed successfully")
         except subprocess.CalledProcessError as e:
             print(f"    ✗ Failed with exit code {e.returncode}")
-            print(f"    Error output: {e.stderr}")
             raise typer.Exit(1)
     
     print("  - Preprocessing pipeline completed successfully")
