@@ -1,50 +1,138 @@
-# SLURM Scripts for Subject-Drop Rearing Experiments
+# Hardware-Specific Scripts for Subject-Drop Rearing Experiments
 
-This directory contains SLURM scripts for running ablative experiments on the cluster using Singularity containers.
+This directory contains scripts organized by hardware type for running ablative experiments on different systems.
 
-## Files
+## Directory Structure
 
-- `run_ablation_experiment.sh`: Main SLURM script for running experiments
-- `submit_experiment.sh`: Helper script for easy job submission
-- `README.md`: This documentation
-
-## Usage
-
-### Quick Start
-
-```bash
-# Submit a preprocessing job
-./scripts/submit_experiment.sh experiment_1_remove_expletives preprocess
-
-# Submit a full pipeline job
-./scripts/submit_experiment.sh experiment_1_remove_expletives full-pipeline
-
-# Submit a training-only job
-./scripts/submit_experiment.sh experiment_0_baseline run
+```
+scripts/
+├── p6000/                    # P6000 GPU cluster scripts
+│   ├── run_ablation_experiment.sh
+│   └── submit_experiment.sh
+├── a5000/                    # A5000 GPU cluster scripts
+│   ├── run_ablation_experiment.sh
+│   └── submit_experiment.sh
+├── titanx/                   # TitanX headnode scripts
+│   └── run_direct_full_pipeline.sh
+├── 3070ti/                   # RTX 3070 Ti Windows scripts
+│   ├── README.md
+│   ├── run_preprocessing.bat
+│   ├── run_tokenizer.bat
+│   ├── run_tokenization.bat
+│   └── run_full_preprocessing.bat
+└── README.md                 # This file
 ```
 
-### Available Phases
+## Hardware-Specific Scripts
 
-1. **preprocess**: Run dataset manipulation pipeline (uses ablation.sif)
-2. **train-tokenizer**: Train SentencePiece tokenizer (uses ablation.sif)
-3. **tokenize-dataset**: Tokenize training data (uses ablation.sif)
-4. **run**: Execute model training (uses training.sif)
+### P6000 Cluster Scripts (`scripts/p6000/`)
+
+**Use for**: P6000 GPU nodes on the cluster
+**Resources**: 8 CPUs, 32GB RAM, P6000 GPU
+**Partition**: `general_gpu_p6000`
+
+```bash
+# Submit preprocessing job
+./scripts/p6000/submit_experiment.sh experiment_1_remove_expletives preprocess
+
+# Submit full pipeline job
+./scripts/p6000/submit_experiment.sh experiment_1_remove_expletives full-pipeline
+
+# Submit training-only job
+./scripts/p6000/submit_experiment.sh experiment_0_baseline run
+```
+
+### A5000 Cluster Scripts (`scripts/a5000/`)
+
+**Use for**: A5000 GPU nodes on the cluster
+**Resources**: 12 CPUs, 64GB RAM, A5000 GPU
+**Partition**: `general_gpu_a5000`
+
+```bash
+# Submit preprocessing job
+./scripts/a5000/submit_experiment.sh experiment_1_remove_expletives preprocess
+
+# Submit full pipeline job
+./scripts/a5000/submit_experiment.sh experiment_1_remove_expletives full-pipeline
+
+# Submit training-only job
+./scripts/a5000/submit_experiment.sh experiment_0_baseline run
+```
+
+### TitanX Headnode Scripts (`scripts/titanx/`)
+
+**Use for**: Direct execution on headnode with TitanX GPU
+**Resources**: Direct access to TitanX GPU
+**No SLURM**: Runs directly on headnode
+
+```bash
+# Run full pipeline directly
+./scripts/titanx/run_direct_full_pipeline.sh experiment_1_remove_expletives
+
+# Run with resume option
+./scripts/titanx/run_direct_full_pipeline.sh experiment_1_remove_expletives --resume
+```
+
+### RTX 3070 Ti Windows Scripts (`scripts/3070ti/`)
+
+**Use for**: Windows machine with RTX 3070 Ti
+**Purpose**: Preprocessing tasks only (corpus ablations, tokenizer training, tokenization)
+**OS**: Windows 10/11
+
+```cmd
+# Run preprocessing only
+scripts\3070ti\run_preprocessing.bat experiment_1_remove_expletives
+
+# Run tokenizer training
+scripts\3070ti\run_tokenizer.bat experiment_1_remove_expletives
+
+# Run dataset tokenization
+scripts\3070ti\run_tokenization.bat experiment_1_remove_expletives
+
+# Run complete preprocessing pipeline
+scripts\3070ti\run_full_preprocessing.bat experiment_1_remove_expletives
+```
+
+## Available Phases
+
+1. **preprocess**: Run dataset manipulation pipeline (corpus ablations)
+2. **train-tokenizer**: Train SentencePiece tokenizer
+3. **tokenize-dataset**: Tokenize training data
+4. **run**: Execute model training
 5. **full-pipeline**: Run all phases in sequence
 
-### Job Submission Examples
+## Job Submission Examples
+
+### Cluster Jobs (P6000/A5000)
 
 ```bash
 # Run preprocessing for expletive removal experiment
-./scripts/submit_experiment.sh experiment_1_remove_expletives preprocess
+./scripts/a5000/submit_experiment.sh experiment_1_remove_expletives preprocess
 
 # Run full pipeline for baseline experiment
-./scripts/submit_experiment.sh experiment_0_baseline full-pipeline
+./scripts/p6000/submit_experiment.sh experiment_0_baseline full-pipeline
 
 # Run training only with custom job name
-./scripts/submit_experiment.sh experiment_0_baseline run baseline_training
+./scripts/a5000/submit_experiment.sh experiment_0_baseline run baseline_training
 ```
 
-### Monitoring Jobs
+### Direct Execution (TitanX)
+
+```bash
+# Run complete pipeline on headnode
+./scripts/titanx/run_direct_full_pipeline.sh experiment_1_remove_expletives
+```
+
+### Windows Preprocessing (3070 Ti)
+
+```cmd
+# Run complete preprocessing pipeline
+scripts\3070ti\run_full_preprocessing.bat experiment_1_remove_expletives
+```
+
+## Monitoring Jobs
+
+### Cluster Jobs
 
 ```bash
 # Check job status
@@ -57,28 +145,37 @@ tail -f logs/subject-drop-experiment_1_remove_expletives-preprocess-<job_id>.out
 scancel <job_id>
 ```
 
+### Windows Jobs
+
+Monitor through:
+- Task Manager (GPU usage)
+- Command prompt output
+- Log files in `logs/` directory
+
 ## Configuration
 
 ### Required Paths
 
-Update these paths in `run_ablation_experiment.sh` to match your cluster environment:
+Update these paths in the respective scripts to match your environment:
 
+**Cluster Scripts**:
 ```bash
 HOST_PROJECT_DIR="/home/AD/thmorton/subject-drop-rearing"
 HOST_ABLATION_SIF_PATH="/home/AD/thmorton/subject-drop-rearing/singularity/ablation.sif"
 HOST_TRAINING_SIF_PATH="/home/AD/thmorton/subject-drop-rearing/singularity/training.sif"
 ```
 
+**Windows Scripts**:
+```batch
+set PROJECT_DIR=C:\path\to\your\subject-drop-rearing
+```
+
 ### SLURM Parameters
 
-The script uses these SLURM parameters:
-- Partition: `general_gpu_a5000`
-- Memory: 64GB
-- CPUs: 12 per task
-- Time limit: 7 days
-- GPU: 1 node with 1 task per node
-
-Adjust these in `run_ablation_experiment.sh` if needed.
+| Hardware | Partition | CPUs | Memory | Time Limit |
+|----------|-----------|------|--------|------------|
+| P6000 | `general_gpu_p6000` | 8 | 32GB | 7 days |
+| A5000 | `general_gpu_a5000` | 12 | 64GB | 7 days |
 
 ## Container Requirements
 
@@ -94,12 +191,23 @@ Adjust these in `run_ablation_experiment.sh` if needed.
 
 ## Experiment Workflow
 
+### Cluster Workflow
+
 1. **Create Experiment Config**: Add a new `.yaml` file to `configs/`
 2. **Submit Preprocessing**: Run dataset manipulation pipeline
 3. **Submit Tokenizer Training**: Train experiment-specific tokenizer
 4. **Submit Dataset Tokenization**: Tokenize training data
 5. **Submit Model Training**: Train the language model
 6. **Evaluate Results**: Use evaluation scripts on trained models
+
+### Windows Workflow (3070 Ti)
+
+1. **Setup Windows Environment**: Follow `scripts/3070ti/README.md`
+2. **Run Preprocessing**: Execute corpus ablations
+3. **Train Tokenizer**: Create experiment-specific tokenizer
+4. **Tokenize Dataset**: Process training data
+5. **Transfer to Cluster**: Move processed data for training
+6. **Cluster Training**: Use cluster scripts for model training
 
 ## Troubleshooting
 
@@ -115,7 +223,7 @@ Adjust these in `run_ablation_experiment.sh` if needed.
 
 ```bash
 # Test script locally (without SLURM)
-bash scripts/run_ablation_experiment.sh experiment_0_baseline validate-config
+bash scripts/a5000/run_ablation_experiment.sh experiment_0_baseline validate-config
 
 # Check container functionality
 singularity exec --bind .:/workspace singularity/ablation.sif python -m model_foundry.cli info
@@ -129,12 +237,12 @@ python -m model_foundry.cli validate-config configs/experiment_0_baseline.yaml
 ### Baseline Experiment
 - **Config**: `experiment_0_baseline.yaml`
 - **Goal**: Control experiment with no ablations
-- **Command**: `./scripts/submit_experiment.sh experiment_0_baseline full-pipeline`
+- **Command**: `./scripts/a5000/submit_experiment.sh experiment_0_baseline full-pipeline`
 
 ### Expletive Removal Experiment
 - **Config**: `experiment_1_remove_expletives.yaml`
 - **Goal**: Test effect of expletive presence on subject-drop acquisition
-- **Command**: `./scripts/submit_experiment.sh experiment_1_remove_expletives full-pipeline`
+- **Command**: `./scripts/a5000/submit_experiment.sh experiment_1_remove_expletives full-pipeline`
 
 ## Log Files
 
@@ -142,4 +250,26 @@ Logs are saved to `logs/` directory with naming pattern:
 - `subject-drop-<config>-<phase>-<job_id>.out` (stdout)
 - `subject-drop-<config>-<phase>-<job_id>.err` (stderr)
 
-Example: `logs/subject-drop-experiment_1_remove_expletives-preprocess-12345.out` 
+Example: `logs/subject-drop-experiment_1_remove_expletives-preprocess-12345.out`
+
+## Hardware Recommendations
+
+### For Preprocessing Tasks
+- **Windows 3070 Ti**: Good for preprocessing, tokenizer training, dataset tokenization
+- **Cluster A5000**: Best for all tasks, especially training
+- **Cluster P6000**: Good for all tasks, slightly less memory than A5000
+
+### For Training Tasks
+- **Cluster A5000**: Recommended for model training
+- **Cluster P6000**: Good for model training
+- **TitanX Headnode**: Good for quick experiments or testing
+- **Windows 3070 Ti**: Not recommended for training (limited VRAM)
+
+## Performance Expectations
+
+| Task | 3070 Ti | P6000 | A5000 | TitanX |
+|------|---------|-------|-------|--------|
+| Preprocessing | 2-4 hours | 1-2 hours | 1-2 hours | 1-2 hours |
+| Tokenizer | 30 min | 15 min | 15 min | 15 min |
+| Tokenization | 1 hour | 30 min | 30 min | 30 min |
+| Training | Not recommended | 2-4 days | 2-4 days | 3-5 days | 
