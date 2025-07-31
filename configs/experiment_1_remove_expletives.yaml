@@ -16,16 +16,16 @@ data:
   batch_size: 256
   max_sequence_length: 128
 
-# --- Dataset Manipulation Pipeline ---
-# This experiment removes expletives from the training corpus
+# --- dataset manipulation pipeline ---
+# this experiment removes expletives from the training corpus
 dataset_manipulation:
   - type: remove_expletives
-    input_path: "data/raw/train_90M/"
+    input_path: "data/raw/train_90m/"
     output_path: "data/processed/exp1_remove_expletives/"
-    # Additional parameters for the expletive removal script
+    # additional parameters for the expletive removal script
     parameters:
       chunk_size: 1000
-      replacement_pool_dir: "data/raw/train_90M/"
+      replacement_pool_dir: "data/raw/pull_10m/"
 
 # --- Tokenizer Configuration ---
 tokenizer:
