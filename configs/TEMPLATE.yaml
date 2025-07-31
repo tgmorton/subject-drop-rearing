@@ -100,6 +100,18 @@ training:
   # As specified in the proposal, this custom strategy saves checkpoints
   # at log-increasing steps (1, 2, 4, 8...) during the first epoch.
   checkpointing_strategy: "log_steps_first_epoch"
+  
+  # Checkpoint generation parameters (NEW)
+  auto_generate_checkpoints: false  # Set to true for automatic schedule generation
+  
+  # First epoch configuration
+  first_epoch_checkpoints: 20      # Number of checkpoints in first epoch
+  
+  # Subsequent epochs configuration
+  subsequent_epochs_spacing: "log"  # "linear" or "log"
+  log_base: 2                      # Base for logarithmic spacing (default 2)
+  linear_interval: null             # Steps between checkpoints for linear spacing (null = auto)
+  min_checkpoint_interval: 100     # Minimum steps between checkpoints
 
 # --- Logging & Reproducibility ---
 # Manages external logging and ensures the experiment can be perfectly replicated.

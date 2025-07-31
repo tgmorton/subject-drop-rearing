@@ -1,0 +1,60 @@
+# ===================================================================
+# EXPERIMENT 5: Remove Expletives + Remove Subject Pronominals
+# GOAL: Test how removing expletives and subject pronominals affects subject-drop learning
+# ===================================================================
+
+experiment_name: "experiment_5_remove_subject_pronominals"
+
+# --- Data Configuration ---
+data:
+  source_corpus: "data/raw/train_90M/"
+  training_corpus: "data/processed/experiment_5_remove_subject_pronominals/"
+  batch_size: 256
+  max_sequence_length: 128
+
+# --- Dataset Manipulation Pipeline ---
+dataset_manipulation:
+  - remove_expletives
+  - remove_subject_pronominals
+
+# --- Tokenizer Configuration ---
+tokenizer:
+  output_dir: "tokenizers/experiment_5_remove_subject_pronominals/"
+  vocab_size: 50004
+
+# --- Model Architecture ---
+model:
+  layers: 12
+  embedding_size: 768
+  hidden_size: 768
+  intermediate_hidden_size: 3072
+  attention_heads: 12
+  activation_function: "GELU"
+  dropout: 0.1
+  attention_dropout: 0.1
+
+# --- Training Procedure ---
+training:
+  output_dir: "models/experiment_5_remove_subject_pronominals/"
+  learning_rate: 0.0001
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-6
+  warmup_steps: 10000
+  train_steps: 1000000
+  epochs: 20
+  
+  # Checkpoint generation parameters
+  auto_generate_checkpoints: true
+  first_epoch_checkpoints: 20
+  subsequent_epochs_spacing: "log"
+  log_base: 2
+  linear_interval: null
+  min_checkpoint_interval: 100
+
+# --- Logging & Reproducibility ---
+logging:
+  use_wandb: true
+  wandb_project: "subject-drop-rearing"
+
+random_seed: 42 
