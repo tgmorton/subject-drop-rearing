@@ -36,7 +36,7 @@ sbatch \
     --ntasks-per-node=1 \
     --cpus-per-task=8 \
     --mem=32G \
-    --time=7-0:00:00 \
+    --time=24:00:00 \
     --output=../logs/%x-%j.out \
     --error=../logs/%x-%j.err \
     run_ablation_experiment.sh "$CONFIG_NAME" "$PHASE"
