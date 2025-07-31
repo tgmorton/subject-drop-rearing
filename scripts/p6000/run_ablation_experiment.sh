@@ -4,9 +4,6 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=10G
 #SBATCH --time=0-1:00:00                    # Time limit (D-HH:MM:SS)
-#SBATCH --output=../logs/%x-%j.out          # Standard output log
-#SBATCH --error=../logs/%x-%j.err           # Standard error log
-
 # Exit on any error
 set -e
 
