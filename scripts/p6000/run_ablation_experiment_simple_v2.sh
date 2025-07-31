@@ -28,25 +28,6 @@ echo "========================================================"
 echo "Loading system modules..."
 module load singularity/4.1.1 cuda/11.8
 
-# --- Download spaCy model if not present ---
-SPACY_MODEL_DIR="${HOST_PROJECT_DIR}/spacy_models"
-EN_CORE_WEB_SM_DIR="${SPACY_MODEL_DIR}/en_core_web_sm"
-
-echo "Checking for spaCy model..."
-if [ ! -d "$EN_CORE_WEB_SM_DIR" ]; then
-    echo "Downloading en_core_web_sm model..."
-    mkdir -p "$SPACY_MODEL_DIR"
-    
-    # Create a temporary container to download the model
-    singularity exec --bind "${HOST_PROJECT_DIR}":/workspace \
-        "${HOST_ABLATION_SIF_PATH}" \
-        bash -c "cd /workspace && python -m spacy download en_core_web_sm --target /workspace/spacy_models"
-    
-    echo "Model downloaded to: $EN_CORE_WEB_SM_DIR"
-else
-    echo "Model already exists at: $EN_CORE_WEB_SM_DIR"
-fi
-
 # --- Define Paths ---
 HOST_PROJECT_DIR="/home/AD/thmorton/subject-drop-rearing"
 HOST_ABLATION_SIF_PATH="/home/AD/thmorton/subject-drop-rearing/singularity/ablation.sif"
@@ -90,12 +71,11 @@ run_in_container() {
     # Set PyTorch CUDA Allocator Config for better memory management
     export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     
-    # Execute the command inside the container
+    # Execute the command inside the container with spaCy model download
     srun singularity exec --nv \
         --bind "${HOST_PROJECT_DIR}":/workspace \
-        --bind "${SPACY_MODEL_DIR}":/workspace/spacy_models \
         "$container_path" \
-        bash -c "cd /workspace && export SPACY_DATA_PATH=/workspace/spacy_models && $command"
+        bash -c "cd /workspace && python -m spacy download en_core_web_sm --quiet && $command"
 }
 
 # --- Phase-specific execution ---
