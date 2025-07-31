@@ -5,6 +5,8 @@ import os
 import glob
 from tqdm import tqdm
 import math
+import logging
+from datetime import datetime
 
 
 def get_spacy_device():
@@ -53,7 +55,7 @@ def count_tokens(text):
     return len(tokens)
 
 
-def find_and_confirm_expletives(doc, nlp_coref):
+def find_and_confirm_expletives(doc, nlp_coref, logger=None):
     """
     Implements Procedure 1 & 2 on a single spaCy Doc object.
     Finds potential dummy pronouns and uses a coreference model on a localized context.
@@ -63,7 +65,20 @@ def find_and_confirm_expletives(doc, nlp_coref):
         tok for tok in doc if tok.dep_ == 'expl' and tok.head.pos_ == 'VERB'
     ]
 
+    if logger:
+        logger.info(f"Found {len(potential_dummies)} potential expletives in sentence: '{doc.text}'")
+
     for token in potential_dummies:
+        if logger:
+            logger.info(f"\n--- Analyzing expletive: '{token.text}' ---")
+            logger.info(f"Token position: {token.i}")
+            logger.info(f"Token dependency: {token.dep_}")
+            logger.info(f"Head verb: '{token.head.text}' (POS: {token.head.pos_})")
+            
+            # Log POS tagging for the entire sentence
+            pos_info = [(tok.text, tok.pos_, tok.dep_) for tok in doc]
+            logger.info(f"Full sentence POS tagging: {pos_info}")
+
         current_sent = token.sent
         prev_sent = None
         if current_sent.start > 0:
@@ -72,36 +87,84 @@ def find_and_confirm_expletives(doc, nlp_coref):
                 prev_sent = prev_token.sent
 
         context_text = prev_sent.text + " " + current_sent.text if prev_sent else current_sent.text
+        
+        if logger:
+            logger.info(f"Context for coreference analysis: '{context_text}'")
+
         coref_doc = nlp_coref(context_text)
 
         is_referential = False
         if 'coref' in coref_doc.spans:
-            for cluster in coref_doc.spans['coref']:
+            if logger:
+                logger.info(f"Found {len(coref_doc.spans['coref'])} coreference clusters")
+            
+            for i, cluster in enumerate(coref_doc.spans['coref']):
+                if logger:
+                    cluster_texts = [mention.text for mention in cluster]
+                    logger.info(f"Cluster {i}: {cluster_texts}")
+                
                 for mention in cluster:
                     if token.text.lower() == mention.text.lower():
                         is_referential = True
+                        if logger:
+                            logger.info(f"✓ Expletive '{token.text}' is referential (found in cluster {i})")
                         break
                 if is_referential:
                     break
+        else:
+            if logger:
+                logger.info("No coreference clusters found")
 
         if not is_referential:
             indices_to_remove.add(token.i)
+            if logger:
+                logger.info(f"✗ Expletive '{token.text}' is NOT referential - will be removed")
+        else:
+            if logger:
+                logger.info(f"✓ Expletive '{token.text}' is referential - will be kept")
+
+    if logger:
+        logger.info(f"Total expletives to remove: {len(indices_to_remove)}")
 
     return indices_to_remove
 
 
-def ablate_doc(doc, nlp_coref):
+def ablate_doc(doc, nlp_coref, logger=None):
     """
     Performs the ablation on a single spaCy Doc object.
     Returns the ablated text for that doc.
     """
-    indices_to_remove = find_and_confirm_expletives(doc, nlp_coref)
+    indices_to_remove = find_and_confirm_expletives(doc, nlp_coref, logger)
 
     if not indices_to_remove:
         return doc.text_with_ws
 
     new_tokens = [tok.text_with_ws for i, tok in enumerate(doc) if i not in indices_to_remove]
     return "".join(new_tokens)
+
+
+def setup_logging(output_dir, filename):
+    """Set up verbose logging to a file in the logs directory."""
+    # Create logs directory if it doesn't exist
+    logs_dir = os.path.join(output_dir, "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    
+    # Create a unique log filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_filename = f"ablation_log_{filename}_{timestamp}.log"
+    log_path = os.path.join(logs_dir, log_filename)
+    
+    # Set up logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_path, mode='w'),
+            logging.StreamHandler()  # Also print to console
+        ]
+    )
+    
+    return logging.getLogger(__name__)
 
 
 def validate_expletive_removal(original_text, ablated_text, nlp):
@@ -136,6 +199,7 @@ def main():
     parser.add_argument("--replacement_pool_dir", required=True,
                         help="Directory containing corresponding replacement pool files.")
     parser.add_argument("--chunk_size", type=int, default=1000, help="Number of lines to process in each chunk.")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging to logs directory.")
     args = parser.parse_args()
 
     # --- Device and Model Loading ---
@@ -151,11 +215,25 @@ def main():
 
     print("Models loaded successfully.")
 
+    # --- Set up logging if verbose mode is enabled ---
+    logger = None
+    if args.verbose:
+        filename = os.path.basename(args.input_dir).replace('/', '_')
+        logger = setup_logging(args.output_dir, filename)
+        logger.info("=== Starting expletive ablation with verbose logging ===")
+        logger.info(f"Input directory: {args.input_dir}")
+        logger.info(f"Output directory: {args.output_dir}")
+        logger.info(f"Replacement pool directory: {args.replacement_pool_dir}")
+        logger.info(f"Chunk size: {args.chunk_size}")
+
     # --- Find all source files ---
     search_pattern = os.path.join(args.input_dir, '**', '*.train')
     source_files = glob.glob(search_pattern, recursive=True)
     if not source_files:
         raise FileNotFoundError(f"No '.train' files found in {args.input_dir}")
+
+    if logger:
+        logger.info(f"Found {len(source_files)} source files to process")
 
     # --- Process each file individually ---
     for source_path in tqdm(source_files, desc="Processing Corpus Files"):
@@ -182,6 +260,12 @@ def main():
         with open(pool_path, 'r', encoding='utf-8') as f:
             replacement_pool_sentences = f.readlines()
 
+        if logger:
+            logger.info(f"\n=== Processing file: {os.path.basename(source_path)} ===")
+            logger.info(f"File path: {source_path}")
+            logger.info(f"Number of lines: {len(lines)}")
+            logger.info(f"Target token count: {target_token_count}")
+
         # --- Ablate the main file in chunks with a correct progress bar ---
         ablated_text = ""
         original_text = "".join(lines)
@@ -194,7 +278,7 @@ def main():
                 chunk = lines[i:i + args.chunk_size]
                 docs = nlp.pipe(chunk)
                 for doc in docs:
-                    ablated_text += ablate_doc(doc, nlp_coref)
+                    ablated_text += ablate_doc(doc, nlp_coref, logger)
                 pbar.update(len(chunk))  # Update by the actual number of lines in the chunk
         
         # Validate that expletives were actually removed
@@ -223,7 +307,7 @@ def main():
                 ablated_chunk_to_add = ""
                 # Also process the replacement chunk with nlp.pipe
                 for doc in nlp.pipe(text_to_add_chunk.splitlines()):
-                    ablated_chunk_to_add += ablate_doc(doc, nlp_coref)
+                    ablated_chunk_to_add += ablate_doc(doc, nlp_coref, logger)
 
                 ablated_text += ablated_chunk_to_add
                 new_token_count = count_tokens(ablated_text)
@@ -240,7 +324,7 @@ def main():
                 break
                 
             doc = nlp(line)
-            ablated_line = ablate_doc(doc, nlp_coref)
+            ablated_line = ablate_doc(doc, nlp_coref, logger)
             ablated_lines.append(ablated_line)
             current_line_tokens += count_tokens(ablated_line)
         
