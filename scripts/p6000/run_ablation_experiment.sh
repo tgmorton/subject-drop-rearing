@@ -1,8 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=subject-drop-ablative    # Descriptive job name
 #SBATCH --gres=gpu:1       # P6000 GPU partition
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=10G
 #SBATCH --time=0-10:00:00                    # Time limit (D-HH:MM:SS)
