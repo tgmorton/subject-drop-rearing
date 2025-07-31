@@ -26,6 +26,8 @@ dataset_manipulation:
     parameters:
       chunk_size: 1000
       replacement_pool_dir: "data/raw/pull_10M/"
+      skip_validation: true
+      verbose: true
 
 # --- Tokenizer Configuration ---
 tokenizer:
