@@ -166,6 +166,32 @@ def tokenize_dataset(
 
 
 @app.command()
+def preprocess_data(
+    config_path: str = typer.Argument(..., help="Path to the experiment's .yaml configuration file"),
+    force_reprocess: bool = Option(False, "--force", help="Force reprocessing even if chunked data exists")
+):
+    """
+    Preprocess the tokenized dataset into fixed-length chunks.
+    
+    This command loads the tokenized dataset, creates fixed-length chunks,
+    and saves the processed dataset to disk for efficient training.
+    """
+    print(f"--- Data Preprocessing: {config_path} ---")
+    
+    config = load_config(config_path)
+    base_dir = find_project_root(__file__)
+    
+    # Import and run the data preprocessing
+    from .data import create_data_processor
+    
+    data_processor = create_data_processor(config, base_dir)
+    success = data_processor.preprocess_data(force_reprocess=force_reprocess)
+    
+    if not success:
+        raise typer.Exit(1)
+
+
+@app.command()
 def run(
     config_path: str = typer.Argument(..., help="Path to the experiment's .yaml configuration file"),
     resume: bool = Option(False, "--resume", help="Resume training from the latest checkpoint")

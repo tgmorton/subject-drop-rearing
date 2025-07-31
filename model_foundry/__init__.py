@@ -12,12 +12,14 @@ __author__ = "Model Foundry Team"
 from .config import ExperimentConfig
 from .model import create_model
 from .trainer import Trainer
+from .data import create_data_processor
 from .utils import find_project_root, set_seed, get_device, get_git_commit_hash
 
 __all__ = [
     "ExperimentConfig",
     "create_model", 
     "Trainer",
+    "create_data_processor",
     "find_project_root",
     "set_seed",
     "get_device",

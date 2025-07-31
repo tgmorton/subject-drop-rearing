@@ -134,7 +134,27 @@ This step trains a new `SentencePiece` tokenizer on the (potentially ablated) co
     ```
   * **Action:** Reads the `tokenizer` and `data` sections and saves a new tokenizer model to the `tokenizers/` directory.
 
-#### Step 4: Train the Model
+#### Step 4: Tokenize the Dataset
+
+This step tokenizes the training corpus using the trained tokenizer.
+
+  * **Command:**
+    ```sh
+    python -m model_foundry.cli tokenize-dataset configs/your_experiment.yaml
+    ```
+  * **Action:** Loads the training corpus, tokenizes it using the SentencePiece model, and saves the tokenized dataset to disk.
+
+#### Step 5: Preprocess Data (NEW)
+
+This step converts the tokenized dataset into fixed-length chunks for efficient training.
+
+  * **Command:**
+    ```sh
+    python -m model_foundry.cli preprocess-data configs/your_experiment.yaml
+    ```
+  * **Action:** Loads the tokenized dataset, creates fixed-length chunks, and saves the processed dataset to disk.
+
+#### Step 6: Train the Model
 
 This step runs the main training loop.
 

@@ -7,8 +7,7 @@ from pathlib import Path
 import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
-from transformers import get_scheduler, DataCollatorForLanguageModeling, AutoTokenizer
-from datasets import load_from_disk
+from transformers import get_scheduler, AutoTokenizer
 from tqdm.auto import tqdm
 import wandb
 import random
@@ -19,20 +18,10 @@ import subprocess
 from .config import ExperimentConfig
 from .model import create_model
 from .utils import find_project_root, set_seed, get_device, get_git_commit_hash
+from .data import create_data_processor
 
 
-def _chunk_examples(batch, block_size: int):
-    """Concatenates and chunks examples to a fixed block size."""
-    concatenated_examples = {k: sum(batch[k], []) for k in batch.keys()}
-    total_length = len(concatenated_examples[list(batch.keys())[0]])
-    if total_length < block_size:
-        return {k: [] for k in batch.keys()}
-    total_length = (total_length // block_size) * block_size
-    result = {
-        k: [t[i: i + block_size] for i in range(0, total_length, block_size)]
-        for k, t in concatenated_examples.items()
-    }
-    return result
+# Removed _chunk_examples function - now handled by DataProcessor
 
 
 class Trainer:
@@ -50,29 +39,18 @@ class Trainer:
         self.tokenizer = None
         self.global_step = 0
         self.epoch = 0
+        
+        # Initialize data processor
+        self.data_processor = create_data_processor(config, base_dir)
 
     def _prepare_data(self):
         """Loads and prepares the dataset and dataloader."""
-        tokenized_data_dir = os.path.join(self.base_dir, "data", "tokenized", self.config.experiment_name)
-        print(f"  - Loading tokenized dataset from: {tokenized_data_dir}")
-        tokenized_dataset = load_from_disk(tokenized_data_dir)
-
-        print("  - Chunking dataset into fixed-length blocks...")
-        chunked_dataset = tokenized_dataset.map(
-            _chunk_examples,
-            batched=True,
-            fn_kwargs={'block_size': self.config.data.max_sequence_length},
-            remove_columns=tokenized_dataset.column_names,
-        )
-        # Use the tokenizer's pad token ID for the collator if it exists
-        pad_token_id = self.tokenizer.pad_token_id if self.tokenizer else -100
-        data_collator = DataCollatorForLanguageModeling(tokenizer=self.tokenizer, mlm=False)
-        self.dataloader = DataLoader(
-            chunked_dataset,
-            batch_size=self.config.data.batch_size,
-            collate_fn=data_collator,
-            shuffle=True
-        )
+        # Preprocess data into fixed-length chunks
+        if not self.data_processor.preprocess_data():
+            raise RuntimeError("Data preprocessing failed")
+        
+        # Create dataloader
+        self.dataloader = self.data_processor.create_dataloader(self.tokenizer)
 
     def _save_checkpoint(self):
         """Saves the complete training state to a checkpoint directory."""
