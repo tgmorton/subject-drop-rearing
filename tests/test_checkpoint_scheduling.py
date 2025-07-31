@@ -1,5 +1,5 @@
 """
-Test script for the checkpoint scheduling system.
+Test script for the new checkpoint scheduling system.
 """
 
 import os
@@ -12,13 +12,11 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from model_foundry.config import ExperimentConfig, DataConfig, TokenizerConfig, ModelConfig, TrainingConfig, LoggingConfig
-# Add scripts to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from generate_checkpoint_schedule import (
+from scripts.generate_checkpoint_schedule import (
     CheckpointGenerationConfig,
-    generate_log_steps,
-    estimate_dataset_size,
+    generate_first_epoch_checkpoints,
+    generate_subsequent_epoch_checkpoints,
+    calculate_steps_per_epoch,
     generate_checkpoint_schedule
 )
 
@@ -26,7 +24,7 @@ from generate_checkpoint_schedule import (
 def create_test_config():
     """Create a test configuration."""
     return ExperimentConfig(
-        experiment_name="test_checkpoint_experiment",
+        experiment_name="test_new_checkpoint_experiment",
         data=DataConfig(
             source_corpus="test_data",
             training_corpus="test_data",
@@ -55,10 +53,12 @@ def create_test_config():
             adam_epsilon=1e-6,
             warmup_steps=100,
             train_steps=1000,
-            epochs=2,
+            epochs=3,
             auto_generate_checkpoints=False,
-            target_checkpoints={"small": 10, "medium": 20, "large": 30, "xlarge": 40},
-            log_steps_first_epoch=True,
+            first_epoch_checkpoints=5,
+            subsequent_epochs_spacing="log",
+            log_base=2,
+            linear_interval=None,
             min_checkpoint_interval=50
         ),
         logging=LoggingConfig(
@@ -69,68 +69,98 @@ def create_test_config():
 
 
 def test_checkpoint_generation_config():
-    """Test the CheckpointGenerationConfig class."""
+    """Test the new CheckpointGenerationConfig class."""
     config = CheckpointGenerationConfig(
-        target_checkpoints={"small": 10, "medium": 20},
-        log_steps_first_epoch=True,
+        first_epoch_checkpoints=10,
+        subsequent_epochs_spacing="log",
+        log_base=2,
+        linear_interval=None,
         min_interval=100
     )
     
-    assert config.target_checkpoints["small"] == 10
-    assert config.target_checkpoints["medium"] == 20
-    assert config.log_steps_first_epoch is True
+    assert config.first_epoch_checkpoints == 10
+    assert config.subsequent_epochs_spacing == "log"
+    assert config.log_base == 2
+    assert config.linear_interval is None
     assert config.min_interval == 100
     
-    # Test string parsing
-    config_from_string = CheckpointGenerationConfig(
-        target_checkpoints="small:10,medium:20"
+    # Test validation
+    try:
+        CheckpointGenerationConfig(subsequent_epochs_spacing="invalid")
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+
+
+def test_generate_first_epoch_checkpoints():
+    """Test first epoch checkpoint generation."""
+    # Test with 5 checkpoints in 100 steps
+    checkpoints = generate_first_epoch_checkpoints(100, 5)
+    
+    assert len(checkpoints) == 5
+    assert checkpoints[0] == 0  # First checkpoint
+    assert checkpoints[-1] == 100  # Last checkpoint
+    
+    # Check that checkpoints are evenly distributed
+    intervals = [checkpoints[i+1] - checkpoints[i] for i in range(len(checkpoints)-1)]
+    assert all(interval > 0 for interval in intervals)
+    
+    # Test edge cases
+    assert generate_first_epoch_checkpoints(100, 0) == []
+    assert generate_first_epoch_checkpoints(100, 1) == [100]
+
+
+def test_generate_subsequent_epoch_checkpoints():
+    """Test subsequent epoch checkpoint generation."""
+    epoch_start = 100
+    epoch_end = 200
+    
+    # Test linear spacing
+    linear_checkpoints = generate_subsequent_epoch_checkpoints(
+        epoch_start, epoch_end, "linear", linear_interval=20
     )
-    assert config_from_string.target_checkpoints["small"] == 10
-    assert config_from_string.target_checkpoints["medium"] == 20
-
-
-def test_generate_log_steps():
-    """Test the log-based step generation."""
-    # Test first epoch only
-    log_steps = generate_log_steps(1000, first_epoch_only=True)
-    assert 1 in log_steps
-    assert 2 in log_steps
-    assert 4 in log_steps
-    assert 8 in log_steps
-    assert 16 in log_steps
-    assert 32 in log_steps
-    # Note: 64 might not be included if it exceeds the first epoch estimate
-    # assert 64 in log_steps
-    # assert 128 in log_steps
     
-    # All steps should be powers of 2
-    for step in log_steps:
-        assert step > 0
-        assert (step & (step - 1)) == 0  # Power of 2 check
+    assert len(linear_checkpoints) > 0
+    for checkpoint in linear_checkpoints:
+        assert epoch_start < checkpoint < epoch_end
     
-    # Test full range
-    log_steps_full = generate_log_steps(1000, first_epoch_only=False)
-    assert len(log_steps_full) > len(log_steps)  # Should have more steps
+    # Test log spacing
+    log_checkpoints = generate_subsequent_epoch_checkpoints(
+        epoch_start, epoch_end, "log", log_base=2
+    )
+    
+    assert len(log_checkpoints) > 0
+    for checkpoint in log_checkpoints:
+        assert epoch_start < checkpoint < epoch_end
+    
+    # Verify log spacing follows the pattern
+    if len(log_checkpoints) > 1:
+        for i in range(len(log_checkpoints) - 1):
+            ratio = log_checkpoints[i+1] / log_checkpoints[i]
+            assert ratio >= 2  # Should be at least base 2
 
 
-def test_estimate_dataset_size():
-    """Test dataset size estimation."""
+def test_calculate_steps_per_epoch():
+    """Test steps per epoch calculation."""
     config = create_test_config()
     base_dir = "/tmp/test"
     
-    # Test fallback estimation
-    size = estimate_dataset_size(config, base_dir)
-    assert size in ["small", "medium", "large", "xlarge"]
+    # Test fallback calculation
+    steps = calculate_steps_per_epoch(config, base_dir)
+    assert steps > 0
+    assert steps == config.training.train_steps // config.training.epochs
 
 
 def test_generate_checkpoint_schedule():
-    """Test checkpoint schedule generation."""
+    """Test the complete checkpoint schedule generation."""
     config = create_test_config()
     base_dir = "/tmp/test"
     
     generation_config = CheckpointGenerationConfig(
-        target_checkpoints={"small": 10, "medium": 20, "large": 30, "xlarge": 40},
-        log_steps_first_epoch=True,
+        first_epoch_checkpoints=5,
+        subsequent_epochs_spacing="log",
+        log_base=2,
+        linear_interval=None,
         min_interval=50
     )
     
@@ -158,36 +188,50 @@ def test_generate_checkpoint_schedule():
             assert epoch_step in schedule
 
 
-def test_schedule_distribution():
-    """Test that checkpoints are distributed reasonably."""
+def test_linear_spacing():
+    """Test linear spacing configuration."""
     config = create_test_config()
     base_dir = "/tmp/test"
     
     generation_config = CheckpointGenerationConfig(
-        target_checkpoints={"small": 5, "medium": 10, "large": 15, "xlarge": 20},
-        log_steps_first_epoch=True,
-        min_interval=100
+        first_epoch_checkpoints=3,
+        subsequent_epochs_spacing="linear",
+        log_base=2,
+        linear_interval=50,
+        min_interval=25
     )
     
     schedule = generate_checkpoint_schedule(config, base_dir, generation_config)
     
-    # Check that gaps between checkpoints are reasonable
-    # Allow for log-based steps which can be close together
-    for i in range(len(schedule) - 1):
-        gap = schedule[i + 1] - schedule[i]
-        # Allow small gaps for log-based steps, but larger gaps should respect min_interval
-        if gap > 50:  # Non-log-based steps
-            assert gap >= generation_config.min_interval
+    # Should have generated a schedule
+    assert len(schedule) > 0
+    
+    # Check that linear intervals are respected where possible
+    steps_per_epoch = config.training.train_steps // config.training.epochs
+    
+    # Check second epoch (should have linear spacing)
+    second_epoch_start = steps_per_epoch
+    second_epoch_end = 2 * steps_per_epoch
+    
+    second_epoch_checkpoints = [s for s in schedule if second_epoch_start < s <= second_epoch_end]
+    
+    if len(second_epoch_checkpoints) > 1:
+        intervals = [second_epoch_checkpoints[i+1] - second_epoch_checkpoints[i] 
+                    for i in range(len(second_epoch_checkpoints)-1)]
+        # Should be approximately linear_interval
+        for interval in intervals:
+            assert abs(interval - generation_config.linear_interval) <= generation_config.linear_interval
 
 
 def test_config_integration():
     """Test integration with the configuration system."""
     config = create_test_config()
     
-    # Test that checkpoint parameters are accessible
-    assert config.training.auto_generate_checkpoints is False
-    assert config.training.target_checkpoints is not None
-    assert config.training.log_steps_first_epoch is True
+    # Test that new checkpoint parameters are accessible
+    assert config.training.first_epoch_checkpoints == 5
+    assert config.training.subsequent_epochs_spacing == "log"
+    assert config.training.log_base == 2
+    assert config.training.linear_interval is None
     assert config.training.min_checkpoint_interval == 50
     
     # Test that we can set checkpoint schedule
@@ -197,24 +241,27 @@ def test_config_integration():
 
 
 if __name__ == "__main__":
-    print("Running checkpoint scheduling tests...")
+    print("Running new checkpoint scheduling tests...")
     
     test_checkpoint_generation_config()
     print("✓ CheckpointGenerationConfig test passed")
     
-    test_generate_log_steps()
-    print("✓ Log steps generation test passed")
+    test_generate_first_epoch_checkpoints()
+    print("✓ First epoch checkpoint generation test passed")
     
-    test_estimate_dataset_size()
-    print("✓ Dataset size estimation test passed")
+    test_generate_subsequent_epoch_checkpoints()
+    print("✓ Subsequent epoch checkpoint generation test passed")
+    
+    test_calculate_steps_per_epoch()
+    print("✓ Steps per epoch calculation test passed")
     
     test_generate_checkpoint_schedule()
-    print("✓ Checkpoint schedule generation test passed")
+    print("✓ Complete checkpoint schedule generation test passed")
     
-    test_schedule_distribution()
-    print("✓ Schedule distribution test passed")
+    test_linear_spacing()
+    print("✓ Linear spacing test passed")
     
     test_config_integration()
     print("✓ Configuration integration test passed")
     
-    print("\nAll checkpoint scheduling tests passed! ✓") 
+    print("\nAll new checkpoint scheduling tests passed! ✓") 

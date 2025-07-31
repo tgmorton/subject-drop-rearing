@@ -33,8 +33,16 @@ class DataProcessor:
     def _validate_tokenized_dataset(self) -> bool:
         """Validate that the tokenized dataset exists and has the expected structure."""
         if not os.path.exists(self.tokenized_data_dir):
-            print(f"  ✗ Tokenized dataset not found at: {self.tokenized_data_dir}")
-            return False
+            # Try the training_corpus path directly
+            training_corpus_path = os.path.join(self.base_dir, self.config.data.training_corpus)
+            if os.path.exists(training_corpus_path):
+                print(f"  ✓ Found tokenized dataset at: {training_corpus_path}")
+                self.tokenized_data_dir = training_corpus_path
+                return True
+            else:
+                print(f"  ✗ Tokenized dataset not found at: {self.tokenized_data_dir}")
+                print(f"  ✗ Also not found at: {training_corpus_path}")
+                return False
             
         try:
             dataset = load_from_disk(self.tokenized_data_dir)

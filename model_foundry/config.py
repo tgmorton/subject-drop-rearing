@@ -35,6 +35,20 @@ class TrainingConfig(BaseModel):
     checkpointing_strategy: Optional[str] = None
     checkpoint_schedule: Optional[List[int]] = []
     resume_from_checkpoint: bool = False
+    
+    # Checkpoint generation parameters
+    auto_generate_checkpoints: bool = False
+    
+    # First epoch configuration
+    first_epoch_checkpoints: int = 20  # Number of checkpoints in first epoch
+    
+    # Subsequent epochs configuration
+    subsequent_epochs_spacing: str = "log"  # "linear" or "log"
+    log_base: int = 2  # Base for logarithmic spacing (default 2)
+    linear_interval: Optional[int] = None  # Steps between checkpoints for linear spacing
+    
+    # Minimum interval between checkpoints
+    min_checkpoint_interval: int = 100
 
 class LoggingConfig(BaseModel):
     use_wandb: bool = False

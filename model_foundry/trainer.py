@@ -52,6 +52,49 @@ class Trainer:
         # Create dataloader
         self.dataloader = self.data_processor.create_dataloader(self.tokenizer)
 
+    def _get_checkpoint_schedule(self) -> set:
+        """
+        Get the checkpoint schedule, either from config or by generating it dynamically.
+        
+        Returns:
+            Set of training steps at which to save checkpoints
+        """
+        # If auto-generation is enabled and no schedule exists, generate one
+        if (self.config.training.auto_generate_checkpoints and 
+            not self.config.training.checkpoint_schedule):
+            
+            print("  - Auto-generating checkpoint schedule...")
+            
+            # Import the schedule generation function
+            from scripts.generate_checkpoint_schedule import (
+                generate_checkpoint_schedule, 
+                CheckpointGenerationConfig
+            )
+            
+            # Create generation config
+            generation_config = CheckpointGenerationConfig(
+                first_epoch_checkpoints=self.config.training.first_epoch_checkpoints,
+                subsequent_epochs_spacing=self.config.training.subsequent_epochs_spacing,
+                log_base=self.config.training.log_base,
+                linear_interval=self.config.training.linear_interval,
+                min_interval=self.config.training.min_checkpoint_interval
+            )
+            
+            # Generate schedule
+            schedule = generate_checkpoint_schedule(
+                self.config, 
+                self.base_dir, 
+                generation_config
+            )
+            
+            # Update the config with the generated schedule
+            self.config.training.checkpoint_schedule = schedule
+            
+            print(f"  - Generated {len(schedule)} checkpoint steps")
+        
+        # Return as set for efficient lookup
+        return set(self.config.training.checkpoint_schedule or [])
+
     def _save_checkpoint(self):
         """Saves the complete training state to a checkpoint directory."""
         checkpoint_dir = Path(self.base_dir) / self.config.training.output_dir / f"checkpoint-{self.global_step}"
@@ -158,7 +201,8 @@ class Trainer:
                 id=wandb.util.generate_id()
             )
 
-        checkpoint_schedule = set(self.config.training.checkpoint_schedule)
+        # Handle checkpoint scheduling
+        checkpoint_schedule = self._get_checkpoint_schedule()
         progress_bar = tqdm(range(self.config.training.train_steps), initial=self.global_step, desc="Training Steps")
 
         self.model.train()

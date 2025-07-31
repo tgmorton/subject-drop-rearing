@@ -192,6 +192,70 @@ def preprocess_data(
 
 
 @app.command()
+def generate_checkpoints(
+    config_path: str = typer.Argument(..., help="Path to the experiment's .yaml configuration file"),
+    output_path: Optional[str] = Option(None, "--output", "-o", help="Output path for updated config (default: overwrite original)"),
+    first_epoch_checkpoints: int = Option(20, "--first-epoch", help="Number of checkpoints in the first epoch"),
+    subsequent_spacing: str = Option("log", "--spacing", help="Spacing for subsequent epochs: 'linear' or 'log'"),
+    log_base: int = Option(2, "--log-base", help="Base for logarithmic spacing (default: 2)"),
+    linear_interval: Optional[int] = Option(None, "--linear-interval", help="Steps between checkpoints for linear spacing"),
+    min_interval: int = Option(100, "--min-interval", help="Minimum interval between checkpoints"),
+):
+    """
+    Generate an optimal checkpoint schedule for a training experiment.
+    
+    This command analyzes the experiment configuration and generates a checkpoint
+    schedule that balances checkpoint frequency with storage efficiency.
+    """
+    print(f"--- Checkpoint Schedule Generation: {config_path} ---")
+    
+    # Import the checkpoint generation functions directly
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    from generate_checkpoint_schedule import (
+        generate_checkpoint_schedule, 
+        CheckpointGenerationConfig,
+        save_schedule_to_config
+    )
+    from model_foundry.config import ExperimentConfig
+    
+    # Load configuration
+    base_dir = find_project_root(__file__)
+    abs_config_path = config_path if Path(config_path).is_absolute() else Path(base_dir) / config_path
+    
+    if not abs_config_path.exists():
+        print(f"Error: Configuration file not found: {abs_config_path}")
+        raise typer.Exit(1)
+    
+    # Load experiment config
+    with open(abs_config_path, 'r') as f:
+        config_data = yaml.safe_load(f)
+    
+    try:
+        config = ExperimentConfig(**config_data)
+    except Exception as e:
+        print(f"Error: Invalid configuration file: {e}")
+        raise typer.Exit(1)
+    
+    # Create generation config
+    generation_config = CheckpointGenerationConfig(
+        first_epoch_checkpoints=first_epoch_checkpoints,
+        subsequent_epochs_spacing=subsequent_spacing,
+        log_base=log_base,
+        linear_interval=linear_interval,
+        min_interval=min_interval
+    )
+    
+    # Generate schedule
+    schedule = generate_checkpoint_schedule(config, str(base_dir), generation_config)
+    
+    # Save to config file
+    save_schedule_to_config(schedule, str(abs_config_path), output_path)
+    
+    print(f"\n✓ Checkpoint schedule generation complete!")
+
+
+@app.command()
 def run(
     config_path: str = typer.Argument(..., help="Path to the experiment's .yaml configuration file"),
     resume: bool = Option(False, "--resume", help="Resume training from the latest checkpoint")

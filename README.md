@@ -154,7 +154,17 @@ This step converts the tokenized dataset into fixed-length chunks for efficient 
     ```
   * **Action:** Loads the tokenized dataset, creates fixed-length chunks, and saves the processed dataset to disk.
 
-#### Step 6: Train the Model
+#### Step 6: Generate Checkpoint Schedule (NEW)
+
+This step generates an optimal checkpoint schedule based on dataset size and training parameters.
+
+  * **Command:**
+    ```sh
+    python -m model_foundry.cli generate-checkpoints configs/your_experiment.yaml
+    ```
+  * **Action:** Analyzes the experiment configuration and generates a checkpoint schedule that balances frequency with storage efficiency.
+
+#### Step 7: Train the Model
 
 This step runs the main training loop.
 
@@ -164,13 +174,31 @@ This step runs the main training loop.
     ```
   * **Action:** Reads all sections of the config, loads the processed data and tokenizer, builds the model, and begins training, saving checkpoints to the `models/` directory.
 
-#### Step 5: Evaluate the Model
+#### Step 8: Evaluate the Model
 
 These scripts are run independently on saved model checkpoints.
 
   * **Command:**
     ```sh
-    # Example for surprisal evaluation
-    python -m evaluation.surprisal --checkpoint_path models/your_experiment/checkpoint-1000/ --stimuli_file data/evaluation_stimuli/minimal_pairs.csv
+    # Surprisal evaluation
+    python evaluation/surprisal.py models/your_experiment/ tokenizers/your_experiment/ evaluation/stimuli/subject_drop_stimuli.json
+    
+    # BLIMP evaluation
+    python evaluation/run_blimp.py models/your_experiment/ tokenizers/your_experiment/
     ```
   * [cite\_start]**Action:** Loads a specific model checkpoint and runs the specified evaluation (e.g., surprisal analysis [cite: 59] [cite\_start]or BLIMP [cite: 69]).
+
+### Complete Pipeline
+
+For a complete experimental pipeline, use the master orchestration script:
+
+```bash
+# Run experiment 1 (remove expletives only)
+python scripts/run_experiment.py 1
+
+# Run experiment 7 (all ablations)
+python scripts/run_experiment.py 7
+
+# Skip certain steps if already completed
+python scripts/run_experiment.py 3 --skip-steps data_preprocessing tokenizer_training
+```
