@@ -12,16 +12,34 @@ def get_spacy_device():
     Detects and returns the best available spaCy device.
     Checks for Apple Silicon (MPS), then CUDA, and defaults to CPU.
     """
+    # Debug: Check environment variables
+    import os
+    cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set')
+    print(f"CUDA_VISIBLE_DEVICES: {cuda_visible_devices}")
+    
     try:
         import torch
+        print(f"PyTorch version: {torch.__version__}")
+        
+        # Check for Apple Silicon (MPS)
         if torch.backends.mps.is_available():
             print("Apple Silicon (MPS) device detected. Using GPU.")
             return "mps"
+        
+        # Check for CUDA
         if torch.cuda.is_available():
-            print("NVIDIA CUDA device detected. Using GPU.")
+            print(f"NVIDIA CUDA device detected. Using GPU.")
+            print(f"CUDA device count: {torch.cuda.device_count()}")
+            for i in range(torch.cuda.device_count()):
+                print(f"  Device {i}: {torch.cuda.get_device_name(i)}")
             return "cuda"
-    except ImportError:
-        pass
+        else:
+            print("PyTorch CUDA not available")
+            
+    except ImportError as e:
+        print(f"PyTorch import error: {e}")
+    except Exception as e:
+        print(f"GPU detection error: {e}")
 
     print("Warning: No compatible GPU detected. spaCy will run on CPU, which may be slow.")
     return "cpu"
