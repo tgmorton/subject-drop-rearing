@@ -19,7 +19,7 @@ echo.
 
 REM --- Define Paths ---
 REM !!! UPDATE THIS TO YOUR PROJECT'S ROOT DIRECTORY !!!
-set PROJECT_DIR=C:\path\to\your\subject-drop-rearing
+set PROJECT_DIR=C:\Users\Thomas\Documents\subject-drop-rearing
 set CONFIG_FILE=configs\%CONFIG_NAME%.yaml
 
 REM --- Preparations ---
@@ -46,7 +46,7 @@ REM === Step 1: Preprocessing ===
 echo ========================================
 echo Step 1/3: Preprocessing (Corpus Ablations)
 echo ========================================
-python -m model_foundry.cli preprocess %CONFIG_FILE%
+venv\Scripts\python.exe -m model_foundry.cli preprocess %CONFIG_FILE%
 
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Preprocessing failed with exit code %ERRORLEVEL%
@@ -57,7 +57,7 @@ REM === Step 2: Train Tokenizer ===
 echo ========================================
 echo Step 2/3: Training Tokenizer
 echo ========================================
-python -m model_foundry.cli train-tokenizer %CONFIG_FILE%
+venv\Scripts\python.exe -m model_foundry.cli train-tokenizer %CONFIG_FILE%
 
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Tokenizer training failed with exit code %ERRORLEVEL%
@@ -68,7 +68,7 @@ REM === Step 3: Tokenize Dataset ===
 echo ========================================
 echo Step 3/3: Tokenizing Dataset
 echo ========================================
-python -m model_foundry.cli tokenize-dataset %CONFIG_FILE%
+venv\Scripts\python.exe -m model_foundry.cli tokenize-dataset %CONFIG_FILE%
 
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Dataset tokenization failed with exit code %ERRORLEVEL%

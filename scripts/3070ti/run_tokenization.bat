@@ -19,7 +19,7 @@ echo.
 
 REM --- Define Paths ---
 REM !!! UPDATE THIS TO YOUR PROJECT'S ROOT DIRECTORY !!!
-set PROJECT_DIR=C:\path\to\your\subject-drop-rearing
+set PROJECT_DIR=C:\Users\Thomas\Documents\subject-drop-rearing
 set CONFIG_FILE=configs\%CONFIG_NAME%.yaml
 
 REM --- Preparations ---
@@ -46,7 +46,7 @@ echo ========================================
 echo.
 
 cd /d "%PROJECT_DIR%"
-python -m model_foundry.cli tokenize-dataset %CONFIG_FILE%
+venv\Scripts\python.exe -m model_foundry.cli tokenize-dataset %CONFIG_FILE%
 
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Dataset tokenization failed with exit code %ERRORLEVEL%

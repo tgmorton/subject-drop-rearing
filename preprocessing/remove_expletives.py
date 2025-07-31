@@ -65,20 +65,7 @@ def find_and_confirm_expletives(doc, nlp_coref, logger=None):
         tok for tok in doc if tok.dep_ == 'expl' and tok.head.pos_ == 'VERB'
     ]
 
-    if logger:
-        logger.info(f"Found {len(potential_dummies)} potential expletives in sentence: '{doc.text}'")
-
     for token in potential_dummies:
-        if logger:
-            logger.info(f"\n--- Analyzing expletive: '{token.text}' ---")
-            logger.info(f"Token position: {token.i}")
-            logger.info(f"Token dependency: {token.dep_}")
-            logger.info(f"Head verb: '{token.head.text}' (POS: {token.head.pos_})")
-            
-            # Log POS tagging for the entire sentence
-            pos_info = [(tok.text, tok.pos_, tok.dep_) for tok in doc]
-            logger.info(f"Full sentence POS tagging: {pos_info}")
-
         current_sent = token.sent
         prev_sent = None
         if current_sent.start > 0:
@@ -88,43 +75,20 @@ def find_and_confirm_expletives(doc, nlp_coref, logger=None):
 
         context_text = prev_sent.text + " " + current_sent.text if prev_sent else current_sent.text
         
-        if logger:
-            logger.info(f"Context for coreference analysis: '{context_text}'")
-
         coref_doc = nlp_coref(context_text)
 
         is_referential = False
         if 'coref' in coref_doc.spans:
-            if logger:
-                logger.info(f"Found {len(coref_doc.spans['coref'])} coreference clusters")
-            
             for i, cluster in enumerate(coref_doc.spans['coref']):
-                if logger:
-                    cluster_texts = [mention.text for mention in cluster]
-                    logger.info(f"Cluster {i}: {cluster_texts}")
-                
                 for mention in cluster:
                     if token.text.lower() == mention.text.lower():
                         is_referential = True
-                        if logger:
-                            logger.info(f"✓ Expletive '{token.text}' is referential (found in cluster {i})")
                         break
                 if is_referential:
                     break
-        else:
-            if logger:
-                logger.info("No coreference clusters found")
 
         if not is_referential:
             indices_to_remove.add(token.i)
-            if logger:
-                logger.info(f"✗ Expletive '{token.text}' is NOT referential - will be removed")
-        else:
-            if logger:
-                logger.info(f"✓ Expletive '{token.text}' is referential - will be kept")
-
-    if logger:
-        logger.info(f"Total expletives to remove: {len(indices_to_remove)}")
 
     return indices_to_remove
 
@@ -137,10 +101,32 @@ def ablate_doc(doc, nlp_coref, logger=None):
     indices_to_remove = find_and_confirm_expletives(doc, nlp_coref, logger)
 
     if not indices_to_remove:
-        return doc.text_with_ws
+        return doc.text_with_ws, 0
 
+    # --- Log the ablation ---
+    if logger:
+        # Get previous sentence for context
+        current_sent = doc[indices_to_remove.copy().pop()].sent
+        prev_sent = None
+        if current_sent.start > 0:
+            prev_token = doc[current_sent.start - 1]
+            prev_sent = prev_token.sent
+            
+        # Create the ablated version of the text for logging
+        new_tokens_for_log = [tok.text_with_ws for i, tok in enumerate(current_sent) if i not in indices_to_remove]
+        ablated_sentence_for_log = "".join(new_tokens_for_log)
+        
+        # Log the change
+        logger.info("--- Expletive Removed ---")
+        if prev_sent:
+            logger.info(f"Previous Sentence: {prev_sent.text.strip()}")
+        logger.info(f"Original Sentence:  {current_sent.text.strip()}")
+        logger.info(f"Ablated Sentence:   {ablated_sentence_for_log.strip()}")
+        logger.info("-" * 25)
+    
+    # Return the new tokens and the number of expletives removed
     new_tokens = [tok.text_with_ws for i, tok in enumerate(doc) if i not in indices_to_remove]
-    return "".join(new_tokens)
+    return "".join(new_tokens), len(indices_to_remove)
 
 
 def setup_logging(output_dir, filename):
@@ -159,8 +145,7 @@ def setup_logging(output_dir, filename):
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(log_path, mode='w'),
-            logging.StreamHandler()  # Also print to console
+            logging.FileHandler(log_path, mode='w')
         ]
     )
     
@@ -172,17 +157,43 @@ def validate_expletive_removal(original_text, ablated_text, nlp):
     Check that expletives were actually removed.
     Returns True if expletives were reduced, False otherwise.
     """
-    original_doc = nlp(original_text)
-    ablated_doc = nlp(ablated_text)
+    # Process in chunks to avoid spaCy's text length limit
+    chunk_size = 500000  # Well under spaCy's 1M limit
     
-    original_expletives = [tok for tok in original_doc if tok.dep_ == 'expl']
-    ablated_expletives = [tok for tok in ablated_doc if tok.dep_ == 'expl']
+    original_expletives = 0
+    ablated_expletives = 0
     
-    print(f"  Original expletives: {len(original_expletives)}")
-    print(f"  Remaining expletives: {len(ablated_expletives)}")
+    # Calculate number of chunks for progress bars
+    original_chunks = (len(original_text) + chunk_size - 1) // chunk_size
+    ablated_chunks = (len(ablated_text) + chunk_size - 1) // chunk_size
     
-    if len(original_expletives) > 0:
-        removal_rate = (len(original_expletives) - len(ablated_expletives)) / len(original_expletives)
+    print(f"  Validating original text ({len(original_text):,} chars) in {original_chunks} chunks...")
+    
+    # Process original text in chunks with progress bar
+    with tqdm(total=original_chunks, desc="    Processing original", leave=False) as pbar:
+        for i in range(0, len(original_text), chunk_size):
+            chunk = original_text[i:i + chunk_size]
+            if chunk.strip():  # Only process non-empty chunks
+                doc = nlp(chunk)
+                original_expletives += len([tok for tok in doc if tok.dep_ == 'expl'])
+            pbar.update(1)
+    
+    print(f"  Validating ablated text ({len(ablated_text):,} chars) in {ablated_chunks} chunks...")
+    
+    # Process ablated text in chunks with progress bar
+    with tqdm(total=ablated_chunks, desc="    Processing ablated", leave=False) as pbar:
+        for i in range(0, len(ablated_text), chunk_size):
+            chunk = ablated_text[i:i + chunk_size]
+            if chunk.strip():  # Only process non-empty chunks
+                doc = nlp(chunk)
+                ablated_expletives += len([tok for tok in doc if tok.dep_ == 'expl'])
+            pbar.update(1)
+    
+    print(f"  Original expletives: {original_expletives}")
+    print(f"  Remaining expletives: {ablated_expletives}")
+    
+    if original_expletives > 0:
+        removal_rate = (original_expletives - ablated_expletives) / original_expletives
         print(f"  Expletive removal rate: {removal_rate:.2%}")
         return removal_rate > 0
     else:
@@ -200,6 +211,7 @@ def main():
                         help="Directory containing corresponding replacement pool files.")
     parser.add_argument("--chunk_size", type=int, default=1000, help="Number of lines to process in each chunk.")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging to logs directory.")
+    parser.add_argument("--skip_validation", action="store_true", help="Skip expletive removal validation to speed up processing.")
     args = parser.parse_args()
 
     # --- Device and Model Loading ---
@@ -207,8 +219,17 @@ def main():
     spacy.prefer_gpu(spacy_device)
 
     print("Loading spaCy models...")
-    # Use the transformer model for better accuracy in dependency parsing and coreference
-    nlp = spacy.load("en_core_web_trf")
+    # Use the smaller model for faster processing on Windows
+    try:
+        nlp = spacy.load("en_core_web_sm")
+        print("Using en_core_web_sm for faster processing")
+    except OSError:
+        print("en_core_web_sm not found, trying en_core_web_trf...")
+        nlp = spacy.load("en_core_web_trf")
+        print("Using en_core_web_trf (slower but more accurate)")
+    
+    # Increase max_length to handle larger texts
+    nlp.max_length = 2000000  # 2M characters instead of default 1M
     
     # Use the same model for coreference resolution
     nlp_coref = nlp
@@ -237,6 +258,14 @@ def main():
 
     # --- Process each file individually ---
     for source_path in tqdm(source_files, desc="Processing Corpus Files"):
+        
+        # --- File-specific stats ---
+        stats = {
+            "file_name": os.path.basename(source_path),
+            "original_tokens": 0,
+            "tokens_removed": 0,
+            "expletives_removed": 0,
+        }
 
         relative_path = os.path.relpath(source_path, args.input_dir)
         pool_path = os.path.join(args.replacement_pool_dir, relative_path)
@@ -251,7 +280,9 @@ def main():
         with open(source_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
             # Calculate target token count from the full original text
-            target_token_count = count_tokens("".join(lines))
+            original_text = "".join(lines)
+            stats["original_tokens"] = count_tokens(original_text)
+            target_token_count = stats["original_tokens"]
 
         if target_token_count == 0:
             open(output_path, 'w').close()
@@ -278,59 +309,84 @@ def main():
                 chunk = lines[i:i + args.chunk_size]
                 docs = nlp.pipe(chunk)
                 for doc in docs:
-                    ablated_text += ablate_doc(doc, nlp_coref, logger)
+                    ablated_doc_text, num_removed = ablate_doc(doc, nlp_coref, logger)
+                    ablated_text += ablated_doc_text
+                    stats["expletives_removed"] += num_removed
                 pbar.update(len(chunk))  # Update by the actual number of lines in the chunk
+                pbar.set_postfix(removed=f'{stats["expletives_removed"]:,}')
         
-        # Validate that expletives were actually removed
-        print(f"\n  Validating expletive removal for {os.path.basename(source_path)}:")
-        validation_success = validate_expletive_removal(original_text, ablated_text, nlp)
-        if not validation_success:
-            print(f"  ⚠️  Warning: No expletives were removed from {os.path.basename(source_path)}")
+        # Validate that expletives were actually removed (unless skipped)
+        if not args.skip_validation:
+            print(f"\n  Validating expletive removal for {os.path.basename(source_path)}:")
+            validation_success = validate_expletive_removal(original_text, ablated_text, nlp)
+            if not validation_success:
+                print(f"  ⚠️  Warning: No expletives were removed from {os.path.basename(source_path)}")
+        else:
+            print(f"\n  Skipping validation for {os.path.basename(source_path)} (--skip_validation flag used)")
 
         # --- Iterative Replacement Loop ---
         current_token_count = count_tokens(ablated_text)
-        with tqdm(
-                total=target_token_count, initial=current_token_count, desc="  Rebuilding to size", leave=False
-        ) as pbar_rebuild:
+        
+        # Add a progress bar for the replacement loop
+        with tqdm(total=target_token_count, initial=current_token_count, desc="  Rebuilding to size", leave=False) as pbar_rebuild:
             while current_token_count < target_token_count:
                 tokens_needed = target_token_count - current_token_count
-
-                text_to_add_chunk = ""
-                while count_tokens(text_to_add_chunk) < tokens_needed * 1.2 and replacement_pool_sentences:
-                    text_to_add_chunk += replacement_pool_sentences.pop(
-                        random.randint(0, len(replacement_pool_sentences) - 1))
+                
+                # Estimate how many sentences to grab from the pool
+                # Use a small sample to estimate average sentence length
+                sample_sentences = random.sample(replacement_pool_sentences, k=min(10, len(replacement_pool_sentences)))
+                avg_tokens_per_sentence = count_tokens(" ".join(sample_sentences)) / len(sample_sentences) if sample_sentences else 20
+                
+                # Grab a chunk of sentences to process
+                num_sentences_to_grab = math.ceil(tokens_needed / avg_tokens_per_sentence) if avg_tokens_per_sentence > 0 else 100
+                
+                text_to_add_chunk_list = []
+                for _ in range(num_sentences_to_grab):
+                    if not replacement_pool_sentences:
+                        break
+                    text_to_add_chunk_list.append(replacement_pool_sentences.pop(random.randint(0, len(replacement_pool_sentences) - 1)))
+                
+                text_to_add_chunk = "".join(text_to_add_chunk_list)
 
                 if not text_to_add_chunk:
                     print(f"\nWarning: Replacement pool for {source_path} exhausted.")
                     break
 
                 ablated_chunk_to_add = ""
-                # Also process the replacement chunk with nlp.pipe
+                chunk_tokens = 0
                 for doc in nlp.pipe(text_to_add_chunk.splitlines()):
-                    ablated_chunk_to_add += ablate_doc(doc, nlp_coref, logger)
+                    ablated_line, num_removed = ablate_doc(doc, nlp_coref, logger)
+                    ablated_chunk_to_add += ablated_line
+                    chunk_tokens += count_tokens(ablated_line)
+                    stats["expletives_removed"] += num_removed
 
                 ablated_text += ablated_chunk_to_add
-                new_token_count = count_tokens(ablated_text)
-                pbar_rebuild.update(new_token_count - current_token_count)
-                current_token_count = new_token_count
-
-        # --- Finalization ---
-        # Preserve line structure by processing line by line
-        ablated_lines = []
-        current_line_tokens = 0
-        
-        for line in lines:
-            if current_line_tokens >= target_token_count:
-                break
                 
-            doc = nlp(line)
-            ablated_line = ablate_doc(doc, nlp_coref, logger)
-            ablated_lines.append(ablated_line)
-            current_line_tokens += count_tokens(ablated_line)
-        
-        # Write the ablated text preserving line structure
+                # Update the progress bar and token count
+                pbar_rebuild.update(chunk_tokens)
+                current_token_count += chunk_tokens
+                pbar_rebuild.set_postfix(removed=f'{stats["expletives_removed"]:,}')
+
+        # Write the ablated text to the output file
         with open(output_path, 'w', encoding='utf-8') as f:
-            f.writelines(ablated_lines)
+            f.writelines(ablated_text.splitlines(keepends=True))
+            
+        # --- Save stats to JSON file ---
+        stats["tokens_removed"] = stats["original_tokens"] - count_tokens(ablated_text)
+        if stats["original_tokens"] > 0:
+            stats["proportion_removed"] = stats["tokens_removed"] / stats["original_tokens"]
+        else:
+            stats["proportion_removed"] = 0
+            
+        stats_dir = os.path.join(args.output_dir, "statistics")
+        os.makedirs(stats_dir, exist_ok=True)
+        stats_filename = os.path.join(stats_dir, f"{os.path.basename(source_path)}.json")
+        
+        with open(stats_filename, 'w', encoding='utf-8') as f:
+            import json
+            json.dump(stats, f, indent=4)
+        
+        print(f"  ✓ Saved statistics to {stats_filename}")
 
     print("\nAblation complete for all files.")
 

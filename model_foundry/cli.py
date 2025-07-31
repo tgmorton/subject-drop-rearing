@@ -107,7 +107,13 @@ def preprocess(
         # Add additional parameters if specified
         if 'parameters' in step:
             for key, value in step['parameters'].items():
-                cmd.extend([f"--{key}", str(value)])
+                if isinstance(value, bool):
+                    # For boolean flags, only add the flag if True
+                    if value:
+                        cmd.extend([f"--{key}"])
+                else:
+                    # For non-boolean values, add both flag and value
+                    cmd.extend([f"--{key}", str(value)])
         
         print(f"    Executing: {' '.join(cmd)}")
         
