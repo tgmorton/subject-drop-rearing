@@ -12,7 +12,7 @@ from pathlib import Path
 
 # Add model_foundry to path for logging_utils import
 sys.path.insert(0, str(Path(__file__).parent.parent / "model_foundry"))
-from logging_utils import setup_logging
+from logging_utils import setup_logging, setup_multi_logging
 
 
 def get_spacy_device(verbose=False):
@@ -107,18 +107,18 @@ def find_and_confirm_expletives(doc, nlp_coref, logger=None):
     return indices_to_remove
 
 
-def ablate_doc(doc, nlp_coref, logger=None):
+def ablate_doc(doc, nlp_coref, ablation_logger=None):
     """
     Performs the ablation on a single spaCy Doc object.
     Returns the ablated text for that doc.
     """
-    indices_to_remove = find_and_confirm_expletives(doc, nlp_coref, logger)
+    indices_to_remove = find_and_confirm_expletives(doc, nlp_coref, ablation_logger)
 
     if not indices_to_remove:
         return doc.text_with_ws, 0
 
     # --- Log the ablation ---
-    if logger:
+    if ablation_logger:
         # Get previous sentence for context
         current_sent = doc[indices_to_remove.copy().pop()].sent
         prev_sent = None
@@ -131,12 +131,12 @@ def ablate_doc(doc, nlp_coref, logger=None):
         ablated_sentence_for_log = "".join(new_tokens_for_log)
         
         # Log the change
-        logger.info("--- Expletive Removed ---")
+        ablation_logger.info("--- Expletive Removed ---")
         if prev_sent:
-            logger.info(f"Previous Sentence: {prev_sent.text.strip()}")
-        logger.info(f"Original Sentence:  {current_sent.text.strip()}")
-        logger.info(f"Ablated Sentence:   {ablated_sentence_for_log.strip()}")
-        logger.info("-" * 25)
+            ablation_logger.info(f"Previous Sentence: {prev_sent.text.strip()}")
+        ablation_logger.info(f"Original Sentence:  {current_sent.text.strip()}")
+        ablation_logger.info(f"Ablated Sentence:   {ablated_sentence_for_log.strip()}")
+        ablation_logger.info("-" * 25)
     
     # Return the new tokens and the number of expletives removed
     new_tokens = [tok.text_with_ws for i, tok in enumerate(doc) if i not in indices_to_remove]
@@ -235,16 +235,20 @@ def main():
     if args.verbose:
         print("Models loaded successfully.")
 
-    # --- Set up logging if verbose mode is enabled ---
-    logger = None
-    if args.verbose:
-        experiment_name = os.path.basename(args.output_dir)
-        logger = setup_logging(__name__, experiment=experiment_name, log_dir="logs")
-        logger.info("=== Starting expletive ablation with verbose logging ===")
-        logger.info(f"Input directory: {args.input_dir}")
-        logger.info(f"Output directory: {args.output_dir}")
-        logger.info(f"Replacement pool directory: {args.replacement_pool_dir}")
-        logger.info(f"Chunk size: {args.chunk_size}")
+    # --- Set up logging ---
+    experiment_name = os.path.basename(args.output_dir)
+    loggers = setup_multi_logging(experiment=experiment_name, log_dir="logs")
+    main_logger = loggers['main']
+    error_logger = loggers['errors']
+    ablation_logger = loggers['ablation']
+    progress_logger = loggers['progress']
+    
+    main_logger.info("=== Starting expletive ablation ===")
+    main_logger.info(f"Input directory: {args.input_dir}")
+    main_logger.info(f"Output directory: {args.output_dir}")
+    main_logger.info(f"Replacement pool directory: {args.replacement_pool_dir}")
+    main_logger.info(f"Chunk size: {args.chunk_size}")
+    main_logger.info(f"Verbose mode: {args.verbose}")
 
     # --- Find all source files ---
     search_pattern = os.path.join(args.input_dir, '**', '*.train')
@@ -252,8 +256,7 @@ def main():
     if not source_files:
         raise FileNotFoundError(f"No '.train' files found in {args.input_dir}")
 
-    if logger:
-        logger.info(f"Found {len(source_files)} source files to process")
+    progress_logger.info(f"Found {len(source_files)} source files to process")
 
     # --- Process each file individually ---
     for source_path in tqdm(source_files, desc="Processing Corpus Files"):
@@ -290,11 +293,10 @@ def main():
         with open(pool_path, 'r', encoding='utf-8') as f:
             replacement_pool_sentences = f.readlines()
 
-        if logger:
-            logger.info(f"\n=== Processing file: {os.path.basename(source_path)} ===")
-            logger.info(f"File path: {source_path}")
-            logger.info(f"Number of lines: {len(lines)}")
-            logger.info(f"Target token count: {target_token_count}")
+        progress_logger.info(f"\n=== Processing file: {os.path.basename(source_path)} ===")
+        progress_logger.info(f"File path: {source_path}")
+        progress_logger.info(f"Number of lines: {len(lines)}")
+        progress_logger.info(f"Target token count: {target_token_count}")
 
         # --- Ablate the main file in chunks with a correct progress bar ---
         ablated_text = ""
@@ -308,7 +310,7 @@ def main():
                 chunk = lines[i:i + args.chunk_size]
                 docs = nlp.pipe(chunk)
                 for doc in docs:
-                    ablated_doc_text, num_removed = ablate_doc(doc, nlp_coref, logger)
+                    ablated_doc_text, num_removed = ablate_doc(doc, nlp_coref, ablation_logger if args.verbose else None)
                     ablated_text += ablated_doc_text
                     stats["expletives_removed"] += num_removed
                 pbar.update(len(chunk))  # Update by the actual number of lines in the chunk

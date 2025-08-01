@@ -44,6 +44,11 @@ def main(
     # Use the root logger name so child loggers inherit handlers
     setup_logging("subject_drop_rearing", experiment=experiment_name,
                   log_dir=log_dir, level=level)
+    
+    # Store these in a way that subcommands can access them
+    import os
+    os.environ['CLI_LOG_LEVEL'] = log_level
+    os.environ['CLI_EXPERIMENT_NAME'] = experiment_name
 
 
 def load_config(config_path: str) -> ExperimentConfig:
@@ -121,6 +126,11 @@ def preprocess(
             "--input_dir", abs_input_path,
             "--output_dir", abs_output_path
         ]
+        
+        # Add verbose flag if CLI is running with verbose logging
+        cli_log_level = os.environ.get('CLI_LOG_LEVEL', 'INFO')
+        if cli_log_level.upper() in ["DEBUG", "VERBOSE"]:
+            cmd.append("--verbose")
         
         # Add additional parameters if specified
         if 'parameters' in step:
