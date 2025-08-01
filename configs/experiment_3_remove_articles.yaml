@@ -14,20 +14,12 @@ data:
 
 # --- Dataset Manipulation Pipeline ---
 dataset_manipulation:
-  - type: remove_expletives
-    input_path: "data/raw/train_90M/"
-    output_path: "data/processed/exp3_intermediate_step1/"
-    parameters:
-      chunk_size: 1000
-      replacement_pool_dir: "data/raw/pull_10M/"
-      skip_validation: true
-      verbose: true
   - type: remove_articles
-    input_path: "data/processed/exp3_intermediate_step1/"
+    input_path: "data/processed/exp1_remove_expletives/"
     output_path: "data/processed/exp3_no_expletives_no_articles/"
     parameters:
       chunk_size: 1000
-      replacement_pool_dir: "data/processed/exp1_remove_expletives/replacement_pool_remainder/"
+      replacement_pool_dir: "data/processed/exp_1_remove_expletives/replacement_pool_remainder/"
       skip_validation: true
       verbose: true
 
