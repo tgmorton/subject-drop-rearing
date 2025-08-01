@@ -29,7 +29,7 @@ module load cuda/11.8 || echo "Warning: cuda/11.8 module not found. Ensure CUDA 
 
 # --- Define Host and Container Paths ---
 # !!! UPDATE THIS TO YOUR PROJECT'S ROOT DIRECTORY !!!
-HOST_PROJECT_DIR="/home/AD/thmorton/subject-drop-rearing"
+HOST_PROJECT_DIR="/labs/ferreiralab/thmorton/subject-drop-rearing"
 HOST_ABLATION_SIF_PATH="${HOST_PROJECT_DIR}/singularity/ablation.sif"
 
 # Construct the full path to the config file from the name

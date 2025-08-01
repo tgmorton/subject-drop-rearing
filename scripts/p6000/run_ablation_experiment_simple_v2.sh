@@ -31,9 +31,9 @@ echo "Loading system modules..."
 module load singularity/4.1.1 cuda/11.8
 
 # --- Define Paths ---
-HOST_PROJECT_DIR="/home/AD/thmorton/subject-drop-rearing"
-HOST_ABLATION_SIF_PATH="/home/AD/thmorton/subject-drop-rearing/singularity/ablation.sif"
-HOST_TRAINING_SIF_PATH="/home/AD/thmorton/subject-drop-rearing/singularity/training.sif"
+HOST_PROJECT_DIR="/labs/ferreiralab/thmorton/subject-drop-rearing"
+HOST_ABLATION_SIF_PATH="/labs/ferreiralab/thmorton/subject-drop-rearing/singularity/ablation.sif"
+HOST_TRAINING_SIF_PATH="/labs/ferreiralab/thmorton/subject-drop-rearing/singularity/training.sif"
 
 # Construct the full path to the config file from the name
 HOST_CONFIG_FILE="${HOST_PROJECT_DIR}/configs/${CONFIG_NAME}.yaml"
