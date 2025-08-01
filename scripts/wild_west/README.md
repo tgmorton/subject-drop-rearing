@@ -7,7 +7,7 @@ A flexible, responsible GPU management system for servers without job schedulers
 This system consists of three main components:
 
 1. **GPU Monitor** (`gpu_monitor.sh`) - Real-time GPU status and resource coordination
-2. **Experiment Runner** (`run_experiment.sh`) - Flexible experiment execution with GPU selection
+2. **Experiment Runner** (`run_experiment.sh`) - Flexible experiment execution with GPU selection using Singularity containers
 3. **Distributed Training** (`run_distributed.sh`) - Multi-GPU distributed training coordination
 
 ## Quick Start
@@ -26,7 +26,7 @@ This system consists of three main components:
 
 ### 2. Run a Simple Experiment
 ```bash
-# Run on GPUs 1 and 2 (default)
+# Run on GPUs 1 and 2 (default) using Singularity containers
 ./scripts/wild_west/run_experiment.sh experiment_1_remove_expletives
 
 # Run on specific GPUs
@@ -34,6 +34,9 @@ This system consists of three main components:
 
 # Run with GPU locking and availability check
 ./scripts/wild_west/run_experiment.sh -g 1,2 -l -c experiment_3_remove_articles
+
+# Run just preprocessing on GPU 1
+./scripts/wild_west/run_experiment.sh -g 1 -p preprocess experiment_1_remove_expletives
 ```
 
 ### 3. Run Distributed Training
@@ -186,6 +189,12 @@ The scripts automatically set these environment variables:
 - `WORLD_SIZE`, `RANK` - For distributed training
 - `NCCL_DEBUG=INFO` - For distributed training debugging
 
+### Singularity Containers
+The scripts use Singularity containers for reproducible environments:
+- **Ablation container** (`singularity/ablation.sif`) - For preprocessing, tokenizer training, and dataset tokenization
+- **Training container** (`singularity/training.sif`) - For model training
+- **spaCy model** - Automatically downloads `en_core_web_sm` if not available
+
 ## Troubleshooting
 
 ### Common Issues
@@ -211,7 +220,24 @@ The scripts automatically set these environment variables:
    ./scripts/wild_west/gpu_monitor.sh unlock <gpu_id>
    ```
 
-4. **Distributed training issues**
+4. **Singularity container not found**
+   ```bash
+   # Check if containers exist
+   ls -la singularity/*.sif
+   
+   # Build containers if needed
+   singularity build singularity/ablation.sif singularity/ablation.def
+   singularity build singularity/training.sif singularity/training.def
+   ```
+
+5. **spaCy model download issues**
+   ```bash
+   # The script automatically downloads en_core_web_sm
+   # If it fails, you can manually download it:
+   singularity exec singularity/ablation.sif python -m spacy download en_core_web_sm
+   ```
+
+6. **Distributed training issues**
    ```bash
    # Check NCCL debug info
    export NCCL_DEBUG=INFO

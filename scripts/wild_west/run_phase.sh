@@ -216,6 +216,11 @@ setup_environment() {
         log "INFO" "Loading system modules..."
         module load singularity/4.1.1 cuda/11.8 2>/dev/null || log "WARN" "Could not load modules"
     fi
+    
+    # Check if singularity is available
+    if ! command -v singularity &> /dev/null; then
+        log "WARN" "Singularity not found in PATH. Make sure it's installed and loaded."
+    fi
 }
 
 # Function to run command in container
@@ -233,11 +238,11 @@ run_in_container() {
         return 1
     fi
     
-    # Execute the command inside the container
+    # Execute the command inside the container with spaCy model download
     singularity exec --nv \
         --bind "${PROJECT_DIR}":/workspace \
         "$container_path" \
-        bash -c "cd /workspace && $command"
+        bash -c "cd /workspace && python -m spacy download en_core_web_sm --quiet && $command"
 }
 
 # Function to build command with overrides

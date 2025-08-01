@@ -160,9 +160,9 @@ Update these paths in the respective scripts to match your environment:
 
 **Cluster Scripts**:
 ```bash
-HOST_PROJECT_DIR="/home/AD/thmorton/subject-drop-rearing"
-HOST_ABLATION_SIF_PATH="/home/AD/thmorton/subject-drop-rearing/singularity/ablation.sif"
-HOST_TRAINING_SIF_PATH="/home/AD/thmorton/subject-drop-rearing/singularity/training.sif"
+HOST_PROJECT_DIR="/labs/ferreiralab/thmorton/subject-drop-rearing"
+HOST_ABLATION_SIF_PATH="/labs/ferreiralab/thmorton/subject-drop-rearing/singularity/ablation.sif"
+HOST_TRAINING_SIF_PATH="/labs/ferreiralab/thmorton/subject-drop-rearing/singularity/training.sif"
 ```
 
 **Windows Scripts**:
