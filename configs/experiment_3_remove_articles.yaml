@@ -19,7 +19,7 @@ dataset_manipulation:
     output_path: "data/processed/exp3_no_expletives_no_articles/"
     parameters:
       chunk_size: 1000
-      replacement_pool_dir: "data/processed/exp_1_remove_expletives/replacement_pool_remainder/"
+      replacement_pool_dir: "data/processed/exp1_remove_expletives/replacement_pool_remainder/"
       skip_validation: true
       verbose: true
 
