@@ -12,10 +12,16 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import argparse
 import json
+import logging
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import numpy as np
 from tqdm import tqdm
+import sys
+
+# Add model_foundry to path for logging_utils import
+sys.path.insert(0, str(Path(__file__).parent.parent / "model_foundry"))
+from logging_utils import setup_logging
 
 
 class SurprisalCalculator:
@@ -237,18 +243,33 @@ def main():
         default="auto",
         help="Device to use (auto, cpu, cuda)"
     )
+    parser.add_argument(
+        "--experiment-name",
+        type=str,
+        default="surprisal_evaluation",
+        help="Experiment name for logging"
+    )
     
     args = parser.parse_args()
     
+    # Set up unified logging
+    logger = setup_logging("surprisal_evaluation", experiment=args.experiment_name, log_dir="logs")
+    logger.info("=== Starting Surprisal Evaluation ===")
+    logger.info(f"Model path: {args.model_path}")
+    logger.info(f"Tokenizer path: {args.tokenizer_path}")
+    logger.info(f"Stimuli path: {args.stimuli_path}")
+    logger.info(f"Output file: {args.output}")
+    logger.info(f"Device: {args.device}")
+    
     # Load stimuli
-    print(f"Loading stimuli from: {args.stimuli_path}")
+    logger.info(f"Loading stimuli from: {args.stimuli_path}")
     stimuli = load_stimuli(args.stimuli_path)
     
     # Initialize calculator
     calculator = SurprisalCalculator(args.model_path, args.tokenizer_path, args.device)
     
     # Evaluate stimuli
-    print("Evaluating stimuli...")
+    logger.info("Evaluating stimuli...")
     results = calculator.evaluate_stimuli_set(stimuli)
     
     # Print summary
@@ -263,7 +284,7 @@ def main():
     
     # Save results
     save_results(results, args.output)
-    print(f"\nResults saved to: {args.output}")
+    logger.info(f"Results saved to: {args.output}")
     
     return 0
 

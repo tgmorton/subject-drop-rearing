@@ -3,6 +3,7 @@ import os
 import yaml
 import glob
 import re
+import logging
 from pathlib import Path
 import torch
 from torch.optim import AdamW
@@ -19,6 +20,7 @@ from .config import ExperimentConfig
 from .model import create_model
 from .utils import find_project_root, set_seed, get_device, get_git_commit_hash
 from .data import create_data_processor
+from .logging_utils import setup_logging
 
 
 # Removed _chunk_examples function - now handled by DataProcessor
@@ -161,7 +163,11 @@ class Trainer:
 
     def train(self):
         """Main training loop."""
-        print(f"--- Starting Training Run for: {self.config.experiment_name} ---")
+        # Set up unified logging
+        logger = setup_logging("trainer", experiment=self.config.experiment_name, 
+                              log_dir=self.config.logging.dir,
+                              level=getattr(logging, self.config.logging.level))
+        logger.info(f"--- Starting Training Run for: {self.config.experiment_name} ---")
 
         set_seed(self.config.random_seed)
 

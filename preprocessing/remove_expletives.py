@@ -7,6 +7,12 @@ from tqdm import tqdm
 import math
 import logging
 from datetime import datetime
+import sys
+from pathlib import Path
+
+# Add model_foundry to path for logging_utils import
+sys.path.insert(0, str(Path(__file__).parent.parent / "model_foundry"))
+from logging_utils import setup_logging
 
 
 def get_spacy_device():
@@ -129,27 +135,7 @@ def ablate_doc(doc, nlp_coref, logger=None):
     return "".join(new_tokens), len(indices_to_remove)
 
 
-def setup_logging(output_dir, filename):
-    """Set up verbose logging to a file in the logs directory."""
-    # Create logs directory if it doesn't exist
-    logs_dir = os.path.join(output_dir, "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-    
-    # Create a unique log filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = f"ablation_log_{filename}_{timestamp}.log"
-    log_path = os.path.join(logs_dir, log_filename)
-    
-    # Set up logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_path, mode='w')
-        ]
-    )
-    
-    return logging.getLogger(__name__)
+# Removed local setup_logging function - now using unified logging from model_foundry.logging_utils
 
 
 def validate_expletive_removal(original_text, ablated_text, nlp):
@@ -239,8 +225,8 @@ def main():
     # --- Set up logging if verbose mode is enabled ---
     logger = None
     if args.verbose:
-        filename = os.path.basename(args.input_dir).replace('/', '_')
-        logger = setup_logging(args.output_dir, filename)
+        experiment_name = os.path.basename(args.output_dir)
+        logger = setup_logging(__name__, experiment=experiment_name, log_dir="logs")
         logger.info("=== Starting expletive ablation with verbose logging ===")
         logger.info(f"Input directory: {args.input_dir}")
         logger.info(f"Output directory: {args.output_dir}")

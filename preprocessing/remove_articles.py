@@ -27,6 +27,12 @@ from tqdm import tqdm
 import math
 import logging
 from datetime import datetime
+import sys
+from pathlib import Path
+
+# Add model_foundry to path for logging_utils import
+sys.path.insert(0, str(Path(__file__).parent.parent / "model_foundry"))
+from logging_utils import setup_logging
 
 
 def get_spacy_device():
@@ -110,27 +116,7 @@ def ablate_doc(doc, logger=None):
     return remove_articles_doc(doc, logger)
 
 
-def setup_logging(output_dir, filename):
-    """Set up logging for verbose mode."""
-    logs_dir = os.path.join(output_dir, "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = f"{filename}_{timestamp}.log"
-    log_path = os.path.join(logs_dir, log_filename)
-    
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_path),
-            logging.StreamHandler()
-        ]
-    )
-    
-    logger = logging.getLogger(__name__)
-    logger.info(f"Logging initialized. Log file: {log_path}")
-    return logger
+# Removed local setup_logging function - now using unified logging from model_foundry.logging_utils
 
 
 def validate_article_removal(original_text, ablated_text, nlp):
@@ -195,8 +181,8 @@ def main():
     # --- Set up logging if verbose mode is enabled ---
     logger = None
     if args.verbose:
-        filename = os.path.basename(args.input_dir).replace('/', '_')
-        logger = setup_logging(args.output_dir, filename)
+        experiment_name = os.path.basename(args.output_dir)
+        logger = setup_logging(__name__, experiment=experiment_name, log_dir="logs")
         logger.info("=== Starting article removal with verbose logging ===")
         logger.info(f"Input directory: {args.input_dir}")
         logger.info(f"Output directory: {args.output_dir}")

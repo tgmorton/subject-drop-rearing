@@ -51,6 +51,8 @@ class TrainingConfig(BaseModel):
     min_checkpoint_interval: int = 100
 
 class LoggingConfig(BaseModel):
+    level: str = "INFO"
+    dir: str = "logs"
     use_wandb: bool = False
     wandb_project: Optional[str] = None
 

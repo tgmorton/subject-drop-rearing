@@ -12,11 +12,17 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import argparse
 import json
+import logging
 from pathlib import Path
 from typing import List, Dict, Optional
 import numpy as np
 from tqdm import tqdm
 from datasets import load_dataset
+import sys
+
+# Add model_foundry to path for logging_utils import
+sys.path.insert(0, str(Path(__file__).parent.parent / "model_foundry"))
+from logging_utils import setup_logging
 
 
 class BLIMPEvaluator:
@@ -313,18 +319,32 @@ def main():
         default="blimp",
         help="BLIMP dataset name (default: blimp)"
     )
+    parser.add_argument(
+        "--experiment-name",
+        type=str,
+        default="blimp_evaluation",
+        help="Experiment name for logging"
+    )
     
     args = parser.parse_args()
+    
+    # Set up unified logging
+    logger = setup_logging("blimp_evaluation", experiment=args.experiment_name, log_dir="logs")
+    logger.info("=== Starting BLIMP Evaluation ===")
+    logger.info(f"Model path: {args.model_path}")
+    logger.info(f"Tokenizer path: {args.tokenizer_path}")
+    logger.info(f"Output file: {args.output}")
+    logger.info(f"Device: {args.device}")
     
     # Initialize evaluator
     evaluator = BLIMPEvaluator(args.model_path, args.tokenizer_path, args.device)
     
     # Run evaluation
     if args.custom_data:
-        print("Evaluating custom BLIMP data...")
+        logger.info("Evaluating custom BLIMP data...")
         results = evaluator.evaluate_custom_blimp_data(args.custom_data)
     else:
-        print("Evaluating BLIMP benchmark...")
+        logger.info("Evaluating BLIMP benchmark...")
         results = evaluator.evaluate_blimp_dataset(args.dataset_name)
     
     # Print summary
@@ -332,7 +352,7 @@ def main():
     
     # Save results
     save_results(results, args.output)
-    print(f"\nResults saved to: {args.output}")
+    logger.info(f"Results saved to: {args.output}")
     
     return 0
 

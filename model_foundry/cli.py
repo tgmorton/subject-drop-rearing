@@ -10,6 +10,7 @@ import os
 import sys
 import yaml
 import subprocess
+import logging
 from pathlib import Path
 from typing import Optional, List
 import typer
@@ -21,12 +22,28 @@ sys.path.insert(0, str(Path(__file__).parent))
 from .config import ExperimentConfig
 from .trainer import Trainer
 from .utils import find_project_root, set_seed
+from .logging_utils import setup_logging
 
 app = typer.Typer(
     name="model-foundry",
     help="Experimental framework for controlled rearing studies of language models",
     add_completion=False
 )
+
+
+@app.callback()
+def main(
+    log_dir: str = typer.Option("logs", help="Root directory for all log files"),
+    log_level: str = typer.Option("INFO", help="Logging level"),
+    experiment_name: str = typer.Option("default", help="Experiment identifier"),
+):
+    """
+    This runs before any sub-command (train, preprocess, …).
+    """
+    level = getattr(logging, log_level.upper(), logging.INFO)
+    # Use the root logger name so child loggers inherit handlers
+    setup_logging("subject_drop_rearing", experiment=experiment_name,
+                  log_dir=log_dir, level=level)
 
 
 def load_config(config_path: str) -> ExperimentConfig:
@@ -59,17 +76,18 @@ def preprocess(
     section of the config file, calling the appropriate scripts from the preprocessing/
     directory.
     """
-    print(f"--- Preprocessing Pipeline: {config_path} ---")
+    logger = logging.getLogger(__name__)
+    logger.info(f"--- Preprocessing Pipeline: {config_path} ---")
     
     config = load_config(config_path)
     base_dir = find_project_root(__file__)
     
     # Check if dataset_manipulation is defined
     if not hasattr(config, 'dataset_manipulation') or not config.dataset_manipulation:
-        print("  - No dataset manipulation pipeline defined. Skipping preprocessing.")
+        logger.info("  - No dataset manipulation pipeline defined. Skipping preprocessing.")
         return
     
-    print(f"  - Found {len(config.dataset_manipulation)} preprocessing steps")
+    logger.info(f"  - Found {len(config.dataset_manipulation)} preprocessing steps")
     
     # Execute each preprocessing step
     for i, step in enumerate(config.dataset_manipulation):
@@ -89,12 +107,12 @@ def preprocess(
         if not os.path.exists(script_path):
             raise typer.BadParameter(f"Preprocessing script not found: {script_path}")
         
-        print(f"  - Step {i+1}: {step_type}")
-        print(f"    Input:  {abs_input_path}")
-        print(f"    Output: {abs_output_path}")
+        logger.info(f"  - Step {i+1}: {step_type}")
+        logger.info(f"    Input:  {abs_input_path}")
+        logger.info(f"    Output: {abs_output_path}")
         
         if dry_run:
-            print(f"    [DRY RUN] Would execute: python {script_path} --input_dir {abs_input_path} --output_dir {abs_output_path}")
+            logger.info(f"    [DRY RUN] Would execute: python {script_path} --input_dir {abs_input_path} --output_dir {abs_output_path}")
             continue
         
         # Execute the preprocessing script
@@ -115,16 +133,16 @@ def preprocess(
                     # For non-boolean values, add both flag and value
                     cmd.extend([f"--{key}", str(value)])
         
-        print(f"    Executing: {' '.join(cmd)}")
+        logger.info(f"    Executing: {' '.join(cmd)}")
         
         try:
             result = subprocess.run(cmd, check=True, capture_output=False, text=True)
-            print(f"    ✓ Completed successfully")
+            logger.info(f"    ✓ Completed successfully")
         except subprocess.CalledProcessError as e:
-            print(f"    ✗ Failed with exit code {e.returncode}")
+            logger.error(f"    ✗ Failed with exit code {e.returncode}")
             raise typer.Exit(1)
     
-    print("  - Preprocessing pipeline completed successfully")
+    logger.info("  - Preprocessing pipeline completed successfully")
 
 
 @app.command()
@@ -137,7 +155,8 @@ def train_tokenizer(
     This command trains a new tokenizer on the training corpus specified in the config,
     using the parameters defined in the 'tokenizer' section.
     """
-    print(f"--- Training Tokenizer: {config_path} ---")
+    logger = logging.getLogger(__name__)
+    logger.info(f"--- Training Tokenizer: {config_path} ---")
     
     config = load_config(config_path)
     base_dir = find_project_root(__file__)
@@ -159,7 +178,8 @@ def tokenize_dataset(
     This command loads the training corpus, tokenizes it using the trained SentencePiece
     model, and saves the tokenized dataset to disk for training.
     """
-    print(f"--- Tokenizing Dataset: {config_path} ---")
+    logger = logging.getLogger(__name__)
+    logger.info(f"--- Tokenizing Dataset: {config_path} ---")
     
     config = load_config(config_path)
     base_dir = find_project_root(__file__)
@@ -182,7 +202,8 @@ def preprocess_data(
     This command loads the tokenized dataset, creates fixed-length chunks,
     and saves the processed dataset to disk for efficient training.
     """
-    print(f"--- Data Preprocessing: {config_path} ---")
+    logger = logging.getLogger(__name__)
+    logger.info(f"--- Data Preprocessing: {config_path} ---")
     
     config = load_config(config_path)
     base_dir = find_project_root(__file__)
@@ -213,7 +234,8 @@ def generate_checkpoints(
     This command analyzes the experiment configuration and generates a checkpoint
     schedule that balances checkpoint frequency with storage efficiency.
     """
-    print(f"--- Checkpoint Schedule Generation: {config_path} ---")
+    logger = logging.getLogger(__name__)
+    logger.info(f"--- Checkpoint Schedule Generation: {config_path} ---")
     
     # Import the checkpoint generation functions directly
     import sys
@@ -230,7 +252,7 @@ def generate_checkpoints(
     abs_config_path = config_path if Path(config_path).is_absolute() else Path(base_dir) / config_path
     
     if not abs_config_path.exists():
-        print(f"Error: Configuration file not found: {abs_config_path}")
+        logger.error(f"Error: Configuration file not found: {abs_config_path}")
         raise typer.Exit(1)
     
     # Load experiment config
@@ -240,7 +262,7 @@ def generate_checkpoints(
     try:
         config = ExperimentConfig(**config_data)
     except Exception as e:
-        print(f"Error: Invalid configuration file: {e}")
+        logger.error(f"Error: Invalid configuration file: {e}")
         raise typer.Exit(1)
     
     # Create generation config
@@ -258,7 +280,7 @@ def generate_checkpoints(
     # Save to config file
     save_schedule_to_config(schedule, str(abs_config_path), output_path)
     
-    print(f"\n✓ Checkpoint schedule generation complete!")
+    logger.info(f"\n✓ Checkpoint schedule generation complete!")
 
 
 @app.command()
@@ -272,7 +294,8 @@ def run(
     This command loads the configuration, prepares the data and model, and executes
     the training loop with the specified hyperparameters.
     """
-    print(f"--- Running Training: {config_path} ---")
+    logger = logging.getLogger(__name__)
+    logger.info(f"--- Running Training: {config_path} ---")
     
     config = load_config(config_path)
     base_dir = find_project_root(__file__)
@@ -296,15 +319,16 @@ def validate_config(
     This command checks that the configuration file is valid and all required
     paths and parameters are properly defined.
     """
-    print(f"--- Validating Configuration: {config_path} ---")
+    logger = logging.getLogger(__name__)
+    logger.info(f"--- Validating Configuration: {config_path} ---")
     
     try:
         config = load_config(config_path)
-        print("  ✓ Configuration is valid")
-        print(f"  - Experiment name: {config.experiment_name}")
-        print(f"  - Training steps: {config.training.train_steps}")
-        print(f"  - Model layers: {config.model.layers}")
-        print(f"  - Vocab size: {config.tokenizer.vocab_size}")
+        logger.info("  ✓ Configuration is valid")
+        logger.info(f"  - Experiment name: {config.experiment_name}")
+        logger.info(f"  - Training steps: {config.training.train_steps}")
+        logger.info(f"  - Model layers: {config.model.layers}")
+        logger.info(f"  - Vocab size: {config.tokenizer.vocab_size}")
         
         # Check if required files exist
         base_dir = find_project_root(__file__)
@@ -313,20 +337,20 @@ def validate_config(
         corpus_path = config.data.training_corpus
         abs_corpus_path = corpus_path if os.path.isabs(corpus_path) else os.path.join(base_dir, corpus_path)
         if os.path.exists(abs_corpus_path):
-            print(f"  ✓ Training corpus exists: {abs_corpus_path}")
+            logger.info(f"  ✓ Training corpus exists: {abs_corpus_path}")
         else:
-            print(f"  ⚠ Training corpus not found: {abs_corpus_path}")
+            logger.warning(f"  ⚠ Training corpus not found: {abs_corpus_path}")
         
         # Check tokenizer directory
         tokenizer_dir = config.tokenizer.output_dir
         abs_tokenizer_dir = tokenizer_dir if os.path.isabs(tokenizer_dir) else os.path.join(base_dir, tokenizer_dir)
         if os.path.exists(abs_tokenizer_dir):
-            print(f"  ✓ Tokenizer directory exists: {abs_tokenizer_dir}")
+            logger.info(f"  ✓ Tokenizer directory exists: {abs_tokenizer_dir}")
         else:
-            print(f"  ⚠ Tokenizer directory not found: {abs_tokenizer_dir}")
+            logger.warning(f"  ⚠ Tokenizer directory not found: {abs_tokenizer_dir}")
         
     except Exception as e:
-        print(f"  ✗ Configuration validation failed: {e}")
+        logger.error(f"  ✗ Configuration validation failed: {e}")
         raise typer.Exit(1)
 
 
