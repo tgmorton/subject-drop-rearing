@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "model_foundry"))
 from logging_utils import setup_logging
 
 
-def get_spacy_device():
+def get_spacy_device(verbose=False):
     """
     Detects and returns the best available spaCy device.
     Checks for Apple Silicon (MPS), then CUDA, and defaults to CPU.
@@ -44,33 +44,41 @@ def get_spacy_device():
     # Debug: Check environment variables
     import os
     cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set')
-    print(f"CUDA_VISIBLE_DEVICES: {cuda_visible_devices}")
+    if verbose:
+        print(f"CUDA_VISIBLE_DEVICES: {cuda_visible_devices}")
     
     try:
         import torch
-        print(f"PyTorch version: {torch.__version__}")
+        if verbose:
+            print(f"PyTorch version: {torch.__version__}")
         
         # Check for Apple Silicon (MPS)
         if torch.backends.mps.is_available():
-            print("Apple Silicon (MPS) device detected. Using GPU.")
+            if verbose:
+                print("Apple Silicon (MPS) device detected. Using GPU.")
             return "mps"
         
         # Check for CUDA
         if torch.cuda.is_available():
-            print(f"NVIDIA CUDA device detected. Using GPU.")
-            print(f"CUDA device count: {torch.cuda.device_count()}")
-            for i in range(torch.cuda.device_count()):
-                print(f"  Device {i}: {torch.cuda.get_device_name(i)}")
+            if verbose:
+                print(f"NVIDIA CUDA device detected. Using GPU.")
+                print(f"CUDA device count: {torch.cuda.device_count()}")
+                for i in range(torch.cuda.device_count()):
+                    print(f"  Device {i}: {torch.cuda.get_device_name(i)}")
             return "cuda"
         else:
-            print("PyTorch CUDA not available")
+            if verbose:
+                print("PyTorch CUDA not available")
             
     except ImportError as e:
-        print(f"PyTorch import error: {e}")
+        if verbose:
+            print(f"PyTorch import error: {e}")
     except Exception as e:
-        print(f"GPU detection error: {e}")
+        if verbose:
+            print(f"GPU detection error: {e}")
 
-    print("Warning: No compatible GPU detected. spaCy will run on CPU, which may be slow.")
+    if verbose:
+        print("Warning: No compatible GPU detected. spaCy will run on CPU, which may be slow.")
     return "cpu"
 
 
@@ -164,23 +172,28 @@ def main():
     args = parser.parse_args()
 
     # --- Device and Model Loading ---
-    spacy_device = get_spacy_device()
+    spacy_device = get_spacy_device(verbose=args.verbose)
     spacy.prefer_gpu(spacy_device)
 
-    print("Loading spaCy models...")
+    if args.verbose:
+        print("Loading spaCy models...")
     # Use the smaller model for faster processing on Windows
     try:
         nlp = spacy.load("en_core_web_sm")
-        print("Using en_core_web_sm for faster processing")
+        if args.verbose:
+            print("Using en_core_web_sm for faster processing")
     except OSError:
-        print("en_core_web_sm not found, trying en_core_web_trf...")
+        if args.verbose:
+            print("en_core_web_sm not found, trying en_core_web_trf...")
         nlp = spacy.load("en_core_web_trf")
-        print("Using en_core_web_trf (slower but more accurate)")
+        if args.verbose:
+            print("Using en_core_web_trf (slower but more accurate)")
     
     # Increase max_length to handle larger texts
     nlp.max_length = 2000000  # 2M characters instead of default 1M
 
-    print("Models loaded successfully.")
+    if args.verbose:
+        print("Models loaded successfully.")
 
     # --- Set up logging if verbose mode is enabled ---
     logger = None
