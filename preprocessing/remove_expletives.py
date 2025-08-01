@@ -375,7 +375,11 @@ def main():
         # --- Save remainder of replacement pool ---
         remainder_dir = os.path.join(args.output_dir, "replacement_pool_remainder")
         os.makedirs(remainder_dir, exist_ok=True)
-        remainder_path = os.path.join(remainder_dir, f"{os.path.basename(source_path)}.txt")
+        # Remove .train extension before adding .txt
+        base_name = os.path.basename(source_path)
+        if base_name.endswith('.train'):
+            base_name = base_name[:-6]  # Remove '.train'
+        remainder_path = os.path.join(remainder_dir, f"{base_name}.txt")
         
         with open(remainder_path, 'w', encoding='utf-8') as f:
             f.writelines(replacement_pool_sentences)
