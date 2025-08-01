@@ -39,35 +39,35 @@ dataset_manipulation:
 # --- Tokenizer Configuration ---
 tokenizer:
   output_dir: "tokenizers/exp2_no_expletives_poor_determiners/"
-  [cite_start]vocab_size: 50004 # [cite: 207]
+  vocab_size: 50004
 
 # --- Model Architecture ---
 # Identical to the baseline.
 model:
-  [cite_start]layers: 12 # [cite: 207]
-  [cite_start]embedding_size: 768 # [cite: 207]
-  [cite_start]hidden_size: 768 # [cite: 207]
-  [cite_start]intermediate_hidden_size: 3072 # [cite: 207]
-  [cite_start]attention_heads: 12 # [cite: 207]
-  [cite_start]activation_function: "GELU" # [cite: 207]
-  [cite_start]dropout: 0.1 # [cite: 207]
-  [cite_start]attention_dropout: 0.1 # [cite: 207]
+  layers: 12
+  embedding_size: 768
+  hidden_size: 768
+  intermediate_hidden_size: 3072
+  attention_heads: 12
+  activation_function: "GELU"
+  dropout: 0.1
+  attention_dropout: 0.1
 
 # --- Training Procedure ---
 # Identical to the baseline.
 training:
   output_dir: "models/exp2_no_expletives_poor_determiners/"
-  [cite_start]learning_rate: 0.0001 # [cite: 207]
-  [cite_start]adam_beta1: 0.9 # [cite: 207]
-  [cite_start]adam_beta2: 0.999 # [cite: 207]
-  [cite_start]adam_epsilon: 1.0e-6 # [cite: 207]
-  [cite_start]warmup_steps: 10000 # [cite: 207]
-  [cite_start]train_steps: 1000000 # [cite: 207]
-  [cite_start]checkpointing_strategy: "log_steps_first_epoch" # [cite: 44]
-  [cite_start]epochs: 20 # [cite: 48]
+  learning_rate: 0.0001
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-6
+  warmup_steps: 10000
+  train_steps: 1000000
+  checkpointing_strategy: "log_steps_first_epoch"
+  epochs: 20
 
 # --- Logging & Reproducibility ---
 logging:
-  [cite_start]use_wandb: true # [cite: 57]
+  use_wandb: true
   wandb_project: "just-drop-the-subject"
 random_seed: 42
